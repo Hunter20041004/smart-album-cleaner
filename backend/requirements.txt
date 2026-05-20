@@ -1,0 +1,7 @@
+# FastAPI 後端額外依賴(主要依賴在 requirements.txt)
+-r ../requirements.txt
+
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pydantic>=2.5
+python-multipart>=0.0.6

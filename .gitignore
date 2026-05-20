@@ -1,0 +1,72 @@
+# ─── Python ──────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ─── 虛擬環境 ────────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+
+# ─── 資料 / 模型 / 隱私 ──────────────────────────────────────────────
+# 訓練資料(可能含使用者私密照片)— 不要 commit
+datasets/raw/*
+datasets/processed/*
+!datasets/raw/Good/.gitkeep
+!datasets/raw/Bad/.gitkeep
+
+# 軟刪除暫存(必含使用者私密照片)— 絕對不能 commit
+Trash/
+**/Trash/
+
+# 模型權重(用 GitHub Releases 發佈,不放在 repo)
+models/*.pth
+
+# Streamlit / SQLite 暫存
+*.db
+*.sqlite
+*.log
+nohup.out
+
+# ─── 編輯器 / IDE ────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ─── Jupyter ─────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ─── 訓練實驗暫存 ────────────────────────────────────────────────────
+mlruns/
+wandb/
+lightning_logs/
+runs/
+
+# ─── macOS ───────────────────────────────────────────────────────────
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# ─── 後端快取(含從私人照片擷取的人臉縮圖) ──────────────────────────
+backend/cache/
+
+# ─── Frontend build ──────────────────────────────────────────────────
+frontend/dist/
+frontend/node_modules/
+
+# ─── Streamlit 使用者資料(含本機路徑) ────────────────────────────────
+.streamlit/recent_folders.json
+
+# ─── Claude Code ─────────────────────────────────────────────────────
+.claude/settings.local.json

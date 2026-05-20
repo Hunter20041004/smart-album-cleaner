@@ -1,0 +1,1425 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>Darkroom · AI 表情相簿管家 — 專題報告</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700;800;900&family=Noto+Serif+TC:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+@page { size: A4 portrait; margin: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-0: #f0ead8; --bg-1: #faf6ea; --bg-2: #ffffff; --bg-3: #f5f0e0;
+  --bg-code: #1c1814;
+  --line-faint: rgba(26,22,18,0.06); --line: rgba(26,22,18,0.12);
+  --line-strong: rgba(26,22,18,0.22);
+  --ink: #1c1814; --ink-soft: #3a342a; --ink-mute: #847e6f; --ink-faint: #b3ad9d;
+  --gold: #a67632; --gold-bright: #b8854a; --gold-deep: #74521f;
+  --gold-tint: rgba(166,118,50,0.10);
+  --crimson: #b03a30; --crimson-tint: rgba(176,58,48,0.10);
+  --sage: #5d8a3c; --sage-tint: rgba(93,138,60,0.10);
+  --indigo: #6863a8; --indigo-tint: rgba(104,99,168,0.10);
+  --font-sans: "Noto Sans TC", "Helvetica Neue", sans-serif;
+  --font-serif: "Noto Serif TC", "Songti TC", serif;
+  --font-mono: "JetBrains Mono", "SF Mono", monospace;
+}
+body {
+  font-family: var(--font-sans); background: var(--bg-1); color: var(--ink);
+  -webkit-font-smoothing: antialiased; font-feature-settings: "palt";
+  font-size: 9pt; line-height: 1.5;
+}
+.page {
+  width: 210mm; min-height: 297mm; max-height: 297mm;
+  padding: 12mm 18mm 8mm 18mm;
+  background: var(--bg-1); position: relative;
+  break-after: page;
+  overflow: hidden;
+}
+.page:last-child { break-after: auto; }
+
+/* 防止表格、code block、callout 等元素被裁切 */
+table, pre, .callout, .quote, .metric-strip, .toc-item, .card,
+.three-col, .two-col, tr, thead, tbody {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+/* 標題之後不要立刻換頁(避免標題孤兒) */
+h1, h2, h3, h4 {
+  page-break-after: avoid;
+  break-after: avoid;
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+p { orphans: 3; widows: 3; }
+
+/* 封面 */
+.cover {
+  padding: 0;
+  background:
+    radial-gradient(700px 400px at 90% 0%, rgba(166,118,50,.10) 0%, transparent 60%),
+    radial-gradient(500px 300px at 0% 100%, rgba(176,58,48,.07) 0%, transparent 60%),
+    var(--bg-1);
+  display: flex; flex-direction: column; justify-content: space-between; height: 297mm;
+}
+.cover-top { padding: 24mm 22mm 0 22mm; position: relative; }
+.cover-top::before {
+  content: ""; position: absolute; left: 22mm; top: 24mm;
+  width: 60mm; height: 3px;
+  background: linear-gradient(90deg, var(--gold), var(--gold-deep));
+}
+.cover-eyebrow {
+  margin-top: 12mm; font-family: var(--font-mono);
+  font-size: 10pt; color: var(--gold);
+  letter-spacing: 0.15em; font-weight: 500; margin-bottom: 6mm;
+}
+.cover-brand {
+  font-family: var(--font-serif); font-size: 48pt; font-weight: 800;
+  color: var(--gold); letter-spacing: -0.02em; line-height: 1; margin-bottom: 4mm;
+}
+.cover-brand .dot { color: var(--crimson); }
+.cover-tagline { font-size: 12pt; color: var(--ink-mute); font-weight: 500; margin-bottom: 18mm; }
+.cover-mid { padding: 0 22mm; }
+.cover-title {
+  font-size: 30pt; font-weight: 800; color: var(--ink);
+  line-height: 1.2; letter-spacing: -0.02em; margin-bottom: 6mm;
+}
+.cover-title .accent { color: var(--gold); }
+.cover-subtitle {
+  font-size: 13pt; color: var(--ink-soft); line-height: 1.6;
+  font-weight: 500; max-width: 160mm;
+}
+.cover-bottom {
+  padding: 0 22mm 24mm 22mm; border-top: 1px solid var(--line);
+  margin: 0 22mm; padding-top: 8mm;
+}
+.cover-info {
+  display: grid; grid-template-columns: 30mm 1fr; gap: 4mm 8mm; font-size: 10.5pt;
+}
+.cover-info .k { color: var(--ink-mute); font-weight: 500; font-size: 10pt; }
+.cover-info .v { color: var(--ink); font-weight: 600; }
+.cover-info .v .dept { color: var(--ink-mute); font-weight: 500; font-size: 9.5pt; }
+.cover-date {
+  margin-top: 6mm; font-family: var(--font-mono); font-size: 9pt;
+  color: var(--ink-faint); letter-spacing: 0.1em;
+}
+
+/* 章節 */
+h1.chapter {
+  font-family: var(--font-sans); font-size: 20pt; font-weight: 800;
+  color: var(--ink); letter-spacing: -0.025em;
+  margin-bottom: 1.5mm; line-height: 1.15;
+}
+h1.chapter .num {
+  display: block; font-family: var(--font-mono);
+  font-size: 8.5pt; font-weight: 700; color: var(--gold);
+  letter-spacing: 0.2em; margin-bottom: 1.5mm;
+}
+.chapter-lead {
+  font-size: 9.5pt; color: var(--ink-soft); font-weight: 500;
+  line-height: 1.5; margin-bottom: 4mm; padding-bottom: 3mm;
+  border-bottom: 1px solid var(--line); max-width: 160mm;
+}
+h2 {
+  font-family: var(--font-sans); font-size: 12pt; font-weight: 700;
+  color: var(--ink); letter-spacing: -0.015em;
+  margin: 4mm 0 2mm 0; display: flex; align-items: baseline; gap: 3mm;
+}
+h2 .num {
+  font-family: var(--font-mono); font-size: 8pt; font-weight: 600;
+  color: var(--gold); letter-spacing: 0.06em;
+}
+h3 {
+  font-family: var(--font-sans); font-size: 10.5pt; font-weight: 700;
+  color: var(--ink); margin: 3mm 0 1.5mm 0;
+}
+p { margin-bottom: 2mm; color: var(--ink-soft); text-align: justify; }
+p b, p strong { color: var(--ink); font-weight: 700; }
+.gold { color: var(--gold); font-weight: 600; }
+ul, ol { margin: 1.5mm 0 2.5mm 0; padding-left: 5mm; color: var(--ink-soft); }
+ul li, ol li { margin-bottom: 1mm; }
+ul li::marker { color: var(--gold); }
+
+pre, code { font-family: var(--font-mono); }
+code {
+  background: var(--gold-tint); color: var(--gold-deep);
+  padding: 1px 5px; border-radius: 3px; font-size: 8.5pt;
+}
+pre {
+  background: var(--bg-code); color: #e6dcc4;
+  padding: 3mm 4mm; border-radius: 4px; font-size: 7.5pt;
+  line-height: 1.4; overflow-x: auto; margin: 2mm 0;
+  border: 1px solid #2a2620; position: relative;
+}
+pre::before {
+  content: attr(data-lang); position: absolute; top: 2mm; right: 4mm;
+  font-size: 7pt; color: var(--gold-bright);
+  letter-spacing: 0.15em; text-transform: uppercase;
+}
+pre code { background: transparent; color: #e6dcc4; padding: 0; }
+pre .kw { color: #c4b9a5; font-weight: 600; }
+pre .str { color: #b8a378; }
+pre .num { color: #b8854a; }
+pre .com { color: #6b6555; font-style: italic; }
+pre .fn { color: #d4a574; }
+
+.callout {
+  background: var(--gold-tint); border-left: 3px solid var(--gold);
+  padding: 2.5mm 4mm; margin: 2.5mm 0; border-radius: 0 4px 4px 0;
+  font-size: 9pt; line-height: 1.5; color: var(--ink);
+}
+.callout b { color: var(--gold-deep); }
+.callout.crimson { background: var(--crimson-tint); border-left-color: var(--crimson); }
+.callout.crimson b { color: var(--crimson); }
+.callout.sage { background: var(--sage-tint); border-left-color: var(--sage); }
+.callout.sage b { color: #3d6822; }
+.callout .label {
+  display: inline-block; font-size: 7.5pt; font-weight: 700;
+  color: var(--gold); letter-spacing: 0.1em; margin-bottom: 1.5mm;
+  text-transform: uppercase; font-family: var(--font-mono);
+}
+
+table {
+  width: 100%; border-collapse: collapse; margin: 2mm 0 3mm 0;
+  font-size: 8.5pt; background: var(--bg-2);
+  border: 1px solid var(--line); border-radius: 4px;
+  overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+table th {
+  background: var(--ink); color: var(--bg-1);
+  padding: 1.5mm 3mm; text-align: left; font-weight: 700; font-size: 8pt;
+}
+table td {
+  padding: 1.5mm 3mm; border-bottom: 1px solid var(--line-faint);
+  color: var(--ink-soft);
+}
+table tr:last-child td { border-bottom: none; }
+table tr:nth-child(even) td { background: var(--bg-3); }
+table .gold { color: var(--gold); font-weight: 700; }
+table .crimson { color: var(--crimson); font-weight: 700; }
+table .sage { color: var(--sage); font-weight: 700; }
+table .best { background: var(--gold-tint) !important; font-weight: 700; }
+table .best td { color: var(--ink); }
+
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; margin: 2mm 0; }
+.three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 3mm; margin: 2mm 0; }
+.card {
+  background: var(--bg-2); border: 1px solid var(--line);
+  border-radius: 4px; padding: 3mm 4mm; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.card h4 { font-size: 9.5pt; font-weight: 700; color: var(--ink); margin-bottom: 1.5mm; }
+.card p, .card li { font-size: 8.5pt; line-height: 1.5; }
+
+.toc { margin-top: 4mm; }
+.toc-item {
+  display: flex; align-items: baseline; gap: 3mm;
+  padding: 1.5mm 0; font-size: 9.5pt; border-bottom: 1px dashed var(--line);
+}
+.toc-num {
+  font-family: var(--font-mono); font-weight: 700; color: var(--gold);
+  width: 14mm; flex-shrink: 0; font-size: 9pt;
+}
+.toc-title { flex: 1; color: var(--ink); font-weight: 600; }
+.toc-title .sub { color: var(--ink-mute); font-weight: 400; font-size: 8.5pt; margin-left: 2mm; }
+.toc-page { color: var(--ink-mute); font-family: var(--font-mono); font-size: 8.5pt; }
+
+.chapter-tag {
+  display: inline-block; font-family: var(--font-mono);
+  font-size: 7.5pt; font-weight: 700; letter-spacing: 0.1em;
+  color: var(--gold); background: var(--gold-tint);
+  padding: 1mm 2.5mm; border-radius: 3px;
+  text-transform: uppercase; margin-bottom: 2mm;
+}
+
+.metric-strip {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 2.5mm; margin: 3mm 0;
+}
+.metric-strip .item {
+  background: var(--bg-2); border: 1px solid var(--line);
+  border-radius: 4px; border-left: 2px solid var(--accent, var(--gold));
+  padding: 2.5mm 3.5mm; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.metric-strip .v {
+  font-size: 14pt; font-weight: 900; color: var(--accent, var(--gold));
+  line-height: 1; letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums; margin-bottom: 0.5mm;
+}
+.metric-strip .k { font-size: 7.5pt; color: var(--ink-mute); font-weight: 600; }
+
+.refs ol { list-style: none; padding: 0; counter-reset: ref; }
+.refs ol li {
+  font-size: 8.5pt; color: var(--ink-soft); line-height: 1.5;
+  padding-left: 8mm; position: relative; margin-bottom: 2mm;
+  counter-increment: ref;
+}
+.refs ol li::before {
+  content: "[" counter(ref) "]"; position: absolute; left: 0;
+  color: var(--gold); font-family: var(--font-mono); font-weight: 700;
+}
+
+.page-footer {
+  position: absolute; bottom: 6mm; left: 18mm; right: 18mm;
+  padding-top: 2mm;
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 7.5pt; color: var(--ink-mute);
+  border-top: 1px solid var(--line-faint);
+}
+.page-footer .brand {
+  font-family: var(--font-serif); font-weight: 700;
+  color: var(--gold); font-size: 9.5pt;
+}
+.page-footer .brand .dot { color: var(--crimson); }
+.page-footer .meta { font-family: var(--font-mono); letter-spacing: 0.05em; }
+</style>
+</head>
+<body>
+
+<!-- ════════════════ 封面 ════════════════ -->
+<div class="page cover">
+  <div class="cover-top">
+    <div class="cover-eyebrow">AI · DEEP LEARNING · COMPUTER VISION</div>
+    <div class="cover-brand">Darkroom<span class="dot">.</span></div>
+    <div class="cover-tagline">AI Photo Curator · 暗房表情相簿管家</div>
+  </div>
+  <div class="cover-mid">
+    <div class="cover-title">
+      基於 MobileNetV3 遷移學習的<br>
+      <span class="accent">人臉表情品質</span>自動評估與相簿廢片清理系統
+    </div>
+    <div class="cover-subtitle">
+      自訓 MobileNetV3-Large + SE Attention 神經網路,從 1,060 張自建資料集學會分辨「表情自然」與「表情崩壞」,並實作 Web UI 讓使用者本機批次清理相簿。
+    </div>
+  </div>
+  <div class="cover-bottom">
+    <div class="cover-info">
+      <span class="k">課程</span>
+      <span class="v">設計思考與人工智慧</span>
+      <span class="k">組別</span>
+      <span class="v">第 14 組 · 國立政治大學</span>
+      <span class="k">作者群</span>
+      <span class="v">
+        曾尉庭<span class="dept">(會計三)</span> ·
+        黃怡瑄<span class="dept">(統計三)</span> ·
+        林雪儀<span class="dept">(歐法四)</span> ·
+        蘇柏文<span class="dept">(廣電三)</span> ·
+        盧品聞<span class="dept">(統計三)</span>
+      </span>
+      <span class="k">關鍵字</span>
+      <span class="v">遷移學習 · MobileNetV3 · SE Attention · MediaPipe · 人臉偵測</span>
+    </div>
+    <div class="cover-date">SPRING 2026 · 期末專題報告</div>
+  </div>
+</div>
+
+<!-- ════════════════ 摘要 + 目錄 ════════════════ -->
+<div class="page">
+  <span class="chapter-tag">ABSTRACT</span>
+  <h1 class="chapter">
+    <span class="num">摘 要</span>
+    Abstract
+  </h1>
+  <div class="chapter-lead">
+    本研究設計並實作一套基於遷移學習的人臉表情品質自動評估系統,協助使用者從相簿中挑出表情崩壞的廢片(閉眼、嘴歪、模糊),並整合人臉偵測創新與嚴謹評估流程。
+  </div>
+
+  <p>
+    在數位攝影時代,每人每天產出大量照片,其中夾雜許多廢片(<b>閉眼、嘴歪、模糊</b>),手動逐張篩選耗時冗長。既有相簿軟體僅能做品質粗篩(模糊、過曝偵測),<b>無法判斷「表情品質」</b>這個高階語意。本研究以遷移學習為核心,在 1,060 張自建資料集上,自訓 MobileNetV3-Large(含 Squeeze-and-Excitation Attention)神經網路,並開發 Streamlit Web UI 讓使用者<b>本機運行、完全離線</b>地批次清理相簿。
+  </p>
+  <p>
+    在資料工程上,我們提出「<span class="gold">三層 Fallback</span>」人臉偵測策略:整合 MediaPipe short-range model、full-range model,以及自行設計的 <b>letterbox 自動裁切</b>機制(處理 iPhone 螢幕截圖的純色邊框),將漏失率從 27 張大幅降至 3 張(<b>改善 88.9%</b>)。在訓練流程上,採用兩階段微調(凍結特徵 → 解凍最後 3 個 inverted residual blocks),搭配 Weight Decay、Label Smoothing、RandomResizedCrop、RandomErasing 等正則化與資料增強策略,並透過 Test-Time Augmentation 與決策閾值自動掃描優化推論。
+  </p>
+  <p>
+    在嚴謹評估上,採 70 / 15 / 15 train / val / test 三段切分,於獨立 test set(n=193)達 <b>75.1% accuracy</b>,Bad 類 recall <b>0.828</b>(廢片偵測成功率高),證明系統具備實際使用價值。我們也對比 MobileNetV2 與 V3-Large,驗證 SE Attention 對人臉細粒度任務的價值(<b>+4 個百分點</b>)。
+  </p>
+
+  <div class="callout">
+    <span class="label">研究貢獻</span>
+    (1) 提出三層 fallback 人臉偵測架構,解決 iPhone 截圖等 edge cases;
+    (2) 完整呈現遷移學習 + 兩階段微調流程,並以對照實驗驗證架構選型;
+    (3) 整合端到端 Web UI,具備軟刪除、還原、視覺化等實際可用功能。
+  </div>
+</div>
+
+<!-- ════════════════ 目錄(單獨一頁) ════════════════ -->
+<div class="page">
+  <span class="chapter-tag">CONTENTS</span>
+  <h1 class="chapter">
+    <span class="num">目 錄</span>
+    Table of Contents
+  </h1>
+  <div class="chapter-lead">
+    本報告分為十章與參考文獻,完整呈現專案的背景動機、設計考量、技術實作、評估結果與反思。
+  </div>
+  <div class="toc">
+    <div class="toc-item"><span class="toc-num">CH 01</span><span class="toc-title">緣起與問題定義<span class="sub">Background & Problem</span></span><span class="toc-page">P. 4</span></div>
+    <div class="toc-item"><span class="toc-num">CH 02</span><span class="toc-title">設計考量<span class="sub">Design Considerations</span></span><span class="toc-page">P. 5</span></div>
+    <div class="toc-item"><span class="toc-num">CH 03</span><span class="toc-title">文獻回顧與技術選型<span class="sub">Literature & Tech Stack</span></span><span class="toc-page">P. 6</span></div>
+    <div class="toc-item"><span class="toc-num">CH 04</span><span class="toc-title">系統架構<span class="sub">System Architecture</span></span><span class="toc-page">P. 7</span></div>
+    <div class="toc-item"><span class="toc-num">CH 05</span><span class="toc-title">資料工程<span class="sub">Data Engineering</span></span><span class="toc-page">P. 8</span></div>
+    <div class="toc-item"><span class="toc-num">CH 06</span><span class="toc-title">模型訓練與調優<span class="sub">Training & Tuning</span></span><span class="toc-page">P. 10</span></div>
+    <div class="toc-item"><span class="toc-num">CH 07</span><span class="toc-title">評估與結果<span class="sub">Evaluation & Results</span></span><span class="toc-page">P. 12</span></div>
+    <div class="toc-item"><span class="toc-num">CH 08</span><span class="toc-title">系統實作與 UI 設計<span class="sub">Implementation</span></span><span class="toc-page">P. 13</span></div>
+    <div class="toc-item"><span class="toc-num">CH 09</span><span class="toc-title">反思與限制<span class="sub">Reflection</span></span><span class="toc-page">P. 14</span></div>
+    <div class="toc-item"><span class="toc-num">CH 10</span><span class="toc-title">結論與未來展望<span class="sub">Conclusion</span></span><span class="toc-page">P. 15</span></div>
+    <div class="toc-item"><span class="toc-num">REF</span><span class="toc-title">參考文獻<span class="sub">References</span></span><span class="toc-page">P. 16</span></div>
+  </div>
+
+  <div class="page-footer">
+    <span class="brand">Darkroom<span class="dot">.</span></span>
+    <span class="meta">CONTENTS · P. 2</span>
+  </div>
+</div>
+
+<!-- ════════════════ 第一章 ════════════════ -->
+<div class="page">
+  <span class="chapter-tag">CHAPTER 01</span>
+  <h1 class="chapter">
+    <span class="num">01 / BACKGROUND</span>
+    緣起與問題定義
+  </h1>
+  <div class="chapter-lead">
+    我們從一個日常的痛點出發:相簿太亂、廢片太多、不敢隨意刪除。既有工具卻只能幫使用者挑出模糊或過曝的照片,無法理解「人臉表情品質」這個更貼近真正在意的層次。
+  </div>
+
+  <h2><span class="num">1.1</span>數位攝影時代的廢片困境</h2>
+  <p>
+    智慧型手機與連拍功能普及,使每位使用者的相簿快速膨脹到數千甚至上萬張照片。其中夾雜大量重複、品質不佳、或表情崩壞的廢片。儘管儲存空間日漸便宜,但「相簿太亂、找不到想要的照片」仍是現代人普遍的數位體驗痛點之一。
+  </p>
+  <p>
+    我們認為,問題不在「存不下」,而在「<b>從上千張照片中找出明顯不會用到的那些</b>」這個操作的時間與心理成本太高 — 連拍 10 張可能有 9 張是閉眼或表情怪,但要逐張點開、檢查、刪除,動輒耗時數十分鐘。
+  </p>
+
+  <h2><span class="num">1.2</span>既有解決方案的局限</h2>
+  <p>我們盤點目前市面上的相簿整理工具:</p>
+
+  <table>
+    <thead><tr><th>產品</th><th>提供的「自動篩選」能力</th><th>核心局限</th></tr></thead>
+    <tbody>
+      <tr><td>iCloud / Google Photos</td><td>智慧分類、面孔識別、相似照片群組</td><td>不會主動建議刪除,使用者仍需逐張決定</td></tr>
+      <tr><td>Gemini Photos (Mac)</td><td>找出重複、模糊、相似照片</td><td>僅基於像素相似度與品質指標,不理解表情</td></tr>
+      <tr><td>CleanMyMac / Photo Sweeper</td><td>大量、模糊、低解析度偵測</td><td>同上,無法分辨「光線好但表情崩壞」的照片</td></tr>
+      <tr><td>Apple「最佳照片建議」</td><td>連拍中推薦最佳一張</td><td>黑盒、不可調、無法批次處理</td></tr>
+    </tbody>
+  </table>
+
+  <p>
+    上述工具均聚焦於「<b>低階品質指標</b>」(模糊、過曝、解析度、重複),但<b>對「人臉表情品質」這個高階語意層面束手無策</b>。一張光線完美、構圖無懈可擊的照片,如果主角閉眼了,仍然是廢片。
+  </p>
+
+  <h2><span class="num">1.3</span>問題定義</h2>
+  <div class="callout">
+    <span class="label">PROBLEM STATEMENT</span>
+    <b>如何在「小資料集」與「完全本機運行」的條件下,訓練一個深度學習模型,對使用者相簿中的人臉照片自動判別「表情自然」與「表情崩壞」,並透過直覺的 Web UI 協助批次清理?</b>
+  </div>
+
+  <p>這是一個<b>二元細粒度影像分類</b>任務,具有三個關鍵約束:</p>
+  <ul>
+    <li><b>小資料集:</b>學期專題時間有限,我們能蒐集到的有標籤資料僅約 1,000 張。</li>
+    <li><b>本機運行:</b>照片屬個人私密資料,使用者期待運算完全在本機完成,不上傳雲端。</li>
+    <li><b>多元場景:</b>使用者相簿包含自拍、合照、影片截圖、社群媒體下載圖等,模型必須對多種來源穩定泛化。</li>
+  </ul>
+
+  <h2><span class="num">1.4</span>專案目標</h2>
+  <div class="three-col">
+    <div class="card">
+      <h4 style="color:var(--gold);">技術目標</h4>
+      <p>建立完整的遷移學習管線,在小資料集條件下達到可實用的分類準確率,並以對照實驗驗證架構選型。</p>
+    </div>
+    <div class="card">
+      <h4 style="color:var(--sage);">產品目標</h4>
+      <p>實作可實際運行的 Web UI,具備批次掃描、視覺化結果、軟刪除與還原等完整功能,而非僅止於 Notebook demo。</p>
+    </div>
+    <div class="card">
+      <h4 style="color:var(--crimson);">學習目標</h4>
+      <p>體現「設計思考 × 人工智慧」的學習目標 — 從使用者痛點出發、迭代原型、最後產出真正能解決問題的工具。</p>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <span class="brand">Darkroom<span class="dot">.</span></span>
+    <span class="meta">CH 01 · 緣起與問題定義 · P. 3</span>
+  </div>
+</div>
+
+<!-- ════════════════ 第二章 ════════════════ -->
+<div class="page">
+  <span class="chapter-tag">CHAPTER 02</span>
+  <h1 class="chapter">
+    <span class="num">02 / DESIGN CONSIDERATIONS</span>
+    設計考量
+  </h1>
+  <div class="chapter-lead">
+    本章說明我們在系統設計時所考量的使用者場景與對應的設計決策,以及這些決策如何具體落實在最終系統的功能上。
+  </div>
+
+  <h2><span class="num">2.1</span>關鍵設計原則</h2>
+  <p>
+    我們在規劃此系統時,將以下四個原則納入設計考量,並讓每個原則對應到一個具體可驗證的功能實作:
+  </p>
+
+  <table>
+    <thead><tr><th>設計原則</th><th>對應的使用者場景</th><th>系統實作對應</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>隱私優先</b></td>
+        <td>使用者擔心私密照片上傳雲端</td>
+        <td>所有運算在本機完成(PyTorch + MediaPipe),無任何網路請求</td>
+      </tr>
+      <tr>
+        <td><b>降低刪除焦慮</b></td>
+        <td>怕誤刪重要照片,所以乾脆不刪</td>
+        <td><b>軟刪除機制</b>:照片搬至 Trash 並寫入 manifest.json,可隨時還原</td>
+      </tr>
+      <tr>
+        <td><b>降低決策疲勞</b></td>
+        <td>逐張判斷耗時且決策力下降</td>
+        <td>結果依「崩壞信心」由高到低排序,使用者可從最有把握的開始勾選</td>
+      </tr>
+      <tr>
+        <td><b>降低操作門檻</b></td>
+        <td>非技術使用者不熟悉指令列</td>
+        <td>Streamlit Web UI,瀏覽器即可使用,無需安裝額外軟體</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2><span class="num">2.2</span>產品迭代</h2>
+  <p>
+    在開發過程中,我們經歷數次原型迭代。每一次迭代都針對前一版本的具體問題提出改善:
+  </p>
+
+  <ul>
+    <li><b>初版(傳統 OpenCV):</b>使用 Laplacian variance 偵測模糊、histogram 偵測過曝。結論:能抓低階品質問題,但無法判斷表情,確認此任務需要深度學習介入。</li>
+    <li><b>第二版(PyTorch baseline):</b>套用 MobileNetV2 + 凍結特徵層的兩階段訓練,val_acc 約 70-72%。確立遷移學習的可行性,但發現人臉偵測有許多漏失案例。</li>
+    <li><b>第三版(三層 Fallback):</b>新增 MediaPipe 雙模型 + letterbox 偵測,將人臉偵測漏失率從 27 張降到 3 張(改善 88.9%)。</li>
+    <li><b>最終版(本報告):</b>升級為 MobileNetV3-Large + SE Attention,並導入 TTA、決策閾值掃描、嚴謹三段切分評估等優化,test_acc 達 75.1%。</li>
+  </ul>
+
+  <h2><span class="num">2.3</span>從失敗案例驅動設計</h2>
+  <p>
+    本研究最關鍵的設計創新 — 三層 Fallback 偵測 — 並非來自理論推導,而是來自<b>對失敗案例的詳細觀察</b>。當我們發現單一模型漏掉 27 張照片時,我們逐張分析這些案例,發現它們可以歸類為三種失敗模式(肖像照、iPhone 截圖、極端 edge cases),進而設計出對應的三層降階策略(詳見第 5 章)。
+  </p>
+
+  <div class="callout">
+    <span class="label">設計反思</span>
+    這個過程體現了設計思考中「<b>從具體案例反推設計</b>」的精神 — 與其先設計通用方案,不如先觀察真實失敗,再針對性提出對策。耐心檢視 edge cases,往往帶來最大的工程突破。
+  </div>
+
+  <div class="page-footer">
+    <span class="brand">Darkroom<span class="dot">.</span></span>
+    <span class="meta">CH 02 · 設計考量 · P. 4</span>
+  </div>
+</div>
+
+<!-- ════════════════ 第三章 ════════════════ -->
+<div class="page">
+  <span class="chapter-tag">CHAPTER 03</span>
+  <h1 class="chapter">
+    <span class="num">03 / LITERATURE & TECH STACK</span>
+    文獻回顧與技術選型
+  </h1>
+  <div class="chapter-lead">
+    本章說明本研究的核心技術與文獻依據:遷移學習、MobileNetV3-Large、SE 注意力機制、MediaPipe 人臉偵測,以及 PyTorch + FastAPI + Vue 3 的部署選擇。
+  </div>
+
+  <h2><span class="num">3.1</span>遷移學習(Transfer Learning)</h2>
+  <p>
+    遷移學習的核心精神是「將在大型資料集(如 ImageNet 的 1,400 萬張圖)上預訓的網路,作為新任務的起點,而非從零開始訓練」。Yosinski et al. (2014) 在《How transferable are features in deep neural networks?》中實證:卷積網路前幾層學到的「邊緣、紋理、形狀」等通用特徵,可廣泛遷移至各種視覺任務。
+  </p>
+  <p>對本研究而言,遷移學習是必要的選擇:</p>
+  <ul>
+    <li>資料集僅 1,060 張,從零訓練 MobileNetV3 必然嚴重過擬合。</li>
+    <li>ImageNet 預訓權重已學會「人臉、眼睛、嘴巴」等低階特徵,我們只需教模型「在這些特徵上,什麼組合 = 崩壞表情」。</li>
+  </ul>
+
+  <h2><span class="num">3.2</span>MobileNetV3-Large 與 SE Attention</h2>
+  <p>MobileNet 系列由 Google 為行動裝置設計,核心目標是「在精度與運算量間取得平衡」。其演進路線:</p>
+  <ul>
+    <li><b>MobileNetV1 (2017):</b>提出 Depthwise Separable Convolution,大幅降低運算量。</li>
+    <li><b>MobileNetV2 (2018):</b>引入 Inverted Residual + Linear Bottleneck,提升特徵表達能力。</li>
+    <li><b>MobileNetV3 (2019, Howard et al.):</b>結合 NAS 自動搜尋最佳架構,並導入 <b>SE Attention 模組</b>與 Hard-Swish 激活函數。</li>
+  </ul>
+
+  <p>SE Attention(Hu et al., 2018)是關鍵的注意力機制 — 它讓網路學會「<b>哪些通道(channel)重要、哪些不重要</b>」,並用 sigmoid 動態調整通道權重:</p>
+
+  <pre data-lang="formula">SE Attention 的三階段:
+  <span class="com"># 1. Squeeze: 把每個通道壓成單一數值(global average pooling)</span>
+  z = GlobalAvgPool(x)                # (B, C, H, W) → (B, C)
+
+  <span class="com"># 2. Excitation: 用 2 層 FC 學「通道重要性」</span>
+  s = sigmoid(W2 · ReLU(W1 · z))      # (B, C) → 通道權重 ∈ [0, 1]
+
+  <span class="com"># 3. Scale: 用權重重新縮放原始特徵圖</span>
+  output = x ⊙ s                       # 通道乘法</pre>
+
+  <p>
+    對人臉表情這種<b>細粒度任務</b>,SE Attention 特別有效 — 它幫助網路自動聚焦於「眼睛、嘴角」等真正承載表情資訊的通道,而忽略背景、頭髮等非關鍵特徵。我們在第 6 章透過 V2 vs V3-Large 對照實驗驗證此論點。
+  </p>
+
+  <h2><span class="num">3.3</span>MediaPipe Face Detection</h2>
+  <p>
+    人臉偵測是本系統的前置步驟。我們選用 Google 開源的 MediaPipe(Bazarevsky et al., 2019, <i>BlazeFace</i>),原因:
+  </p>
+  <ul>
+    <li><b>輕量高速:</b>BlazeFace 在 CPU 上單張推論時間極短,適合即時批次處理。</li>
+    <li><b>提供兩種模型:</b>short-range(< 2 公尺,擅長肖像)與 full-range(< 5 公尺,擅長合照中遠距人臉),我們將兩者整合為 fallback 鏈。</li>
+    <li><b>輸出 bounding box + 關鍵點:</b>除了 bbox,還回傳眼睛、嘴巴等關鍵點(本研究僅使用 bbox)。</li>
+  </ul>
+
+  <h2><span class="num">3.4</span>框架選擇:PyTorch + FastAPI + Vue 3</h2>
+  <table>
+    <thead><tr><th>選項</th><th>選用</th><th>理由</th></tr></thead>
+    <tbody>
+      <tr><td>PyTorch vs TensorFlow</td><td class="gold">PyTorch</td><td>Apple Silicon MPS 後端成熟、torchvision 內建 MobileNetV3、學界主流</td></tr>
+      <tr><td>Streamlit vs FastAPI</td><td class="gold">FastAPI + Vue 3</td><td>Streamlit 互動 rerun 卡頓,改為前後端分離以追求流暢 UX(詳見 CH08)</td></tr>
+      <tr><td>本機 vs 雲端推論</td><td class="gold">本機</td><td>隱私第一(照片不出本機),且 1,000 張可在合理時間內處理完成</td></tr>
+    </tbody>
+  </table>
+
+  <div class="page-footer">
+    <span class="brand">Darkroom<span class="dot">.</span></span>
+    <span class="meta">CH 03 · 文獻回顧與技術選型 · P. 5</span>
+  </div>
+</div>
+
+<!-- ════════════════ 第四章 ════════════════ -->
+<div class="page">
+  <span class="chapter-tag">CHAPTER 04</span>
+  <h1 class="chapter">
+    <span class="num">04 / SYSTEM ARCHITECTURE</span>
+    系統架構
+  </h1>
+  <div class="chapter-lead">
+    本系統採「<b>前後端分離</b>」架構:Python 端負責資料處理、模型訓練與推論;Web 端以 FastAPI 提供 REST API、Vue 3 提供使用者介面。本章說明整體 pipeline、模組分工,以及 checkpoint 的自描述設計。
+  </div>
+
+  <h2><span class="num">4.1</span>整體流程</h2>
+  <p>系統可分為「離線階段(模型訓練)」與「線上階段(Web 服務)」兩大流程:</p>
+
+  <pre data-lang="pipeline">─────── 離線:模型訓練 pipeline ───────
+原始照片 / 影片
+        │
+        ▼
+┌──────────────────────────┐
+│  prepare_dataset.py      │   ① 資料前處理
+│  MediaPipe 三層 Fallback │   ─ short-range + full-range
+│  Letterbox 自動裁切      │   ─ 純色邊框偵測
+│  224×224 標準化          │
+└──────────────────────────┘
+        │
+        ▼
+┌──────────────────────────┐
+│  train_mobilenet.py      │   ② 模型訓練
+│  MobileNetV3-Large       │   ─ ImageNet 預訓 backbone
+│  Two-Stage Fine-Tuning   │   ─ Stage-1 凍結 → Stage-2 解凍
+│  Weight Decay + LS       │   ─ 寫入自描述 checkpoint
+└──────────────────────────┘
+        │
+        ▼
+┌──────────────────────────┐
+│  evaluate.py             │   ③ 評估腳本(獨立)
+│  Confusion Matrix        │   ─ sklearn.metrics
+│  Per-class P/R/F1        │   ─ 找出模型瓶頸
+└──────────────────────────┘
+
+─────── 線上:Web 服務(前後端分離) ───────
+
+┌─── 後端(Python · FastAPI) ───────┐
+│  backend/main.py                  │
+│  ├─ POST /api/scan      啟動掃描  │
+│  ├─ GET  /api/scan/{id} 查詢進度  │
+│  ├─ GET  /api/image     縮圖服務  │
+│  ├─ GET  /api/face/{id} 人臉縮圖  │
+│  ├─ POST /api/trash     軟刪除    │
+│  ├─ GET  /api/trash     列出 Trash│
+│  └─ POST /api/trash/restore 還原  │
+└────────────────────────────────────┘
+        ▲  REST API (JSON + HTTP image)
+        │
+┌─── 前端(JS · Vue 3 + Vite) ──────┐
+│  frontend/src/                     │
+│  ├─ App.vue          根組件         │
+│  ├─ Sidebar.vue      控制面板       │
+│  ├─ WelcomePage.vue  歡迎頁         │
+│  ├─ ScanProgress.vue 進度卡         │
+│  ├─ ResultsView.vue  三分頁結果     │
+│  └─ TrashView.vue    Trash 檢視     │
+└────────────────────────────────────┘
+        ▲  使用者操作
+        │
+     瀏覽器</pre>
+
+  <div class="page-footer">
+    <span class="brand">Darkroom<span class="dot">.</span></span>
+    <span class="meta">CH 04 · 系統架構 · P. 6</span>
+  </div>
+</div>
+
+<!-- ════════════════ 第四章續 (P.7) ════════════════ -->
+<div class="page">
+  <h2><span class="num">4.2</span>模組分工</h2>
+
+  <h3>離線:模型 / 資料處理(Python)</h3>
+  <table>
+    <thead><tr><th>模組</th><th>核心職責</th></tr></thead>
+    <tbody>
+      <tr><td><code>src/prepare_dataset.py</code></td><td>讀原始照片 → MediaPipe 偵測 → letterbox 裁切 → 輸出 224×224</td></tr>
+      <tr><td><code>src/train_mobilenet.py</code></td><td>兩階段訓練 + 閾值掃描 + 寫入 checkpoint metadata</td></tr>
+      <tr><td><code>src/predict_face.py</code></td><td>對外公開的 <code>predict_image_quality()</code> 函式</td></tr>
+      <tr><td><code>src/evaluate.py</code></td><td>獨立評估腳本,產出 confusion matrix PNG + 錯誤報告</td></tr>
+      <tr><td><code>tests/test_predict_face.py</code></td><td>9 個 pytest 單元測試,覆蓋推論流程邊界</td></tr>
+    </tbody>
+  </table>
+
+  <h3>線上:Web 服務(FastAPI + Vue 3)</h3>
+  <table>
+    <thead><tr><th>模組</th><th>核心職責</th></tr></thead>
+    <tbody>
+      <tr><td><code>backend/main.py</code></td><td>FastAPI 應用:scan / image / trash 等 REST endpoints,內呼 <code>predict_face</code></td></tr>
+      <tr><td><code>backend/cache/</code></td><td>縮圖與人臉裁切的快取目錄(MD5 hash 命名,自動失效)</td></tr>
+      <tr><td><code>frontend/src/App.vue</code></td><td>Vue 3 根組件,管理全局狀態(reactive state)</td></tr>
+      <tr><td><code>frontend/src/components/*.vue</code></td><td>6 個 SFC 元件:Sidebar、Welcome、Progress、Results、TrashView 等</td></tr>
+      <tr><td><code>frontend/src/api.js</code></td><td>API client,集中管理所有後端呼叫</td></tr>
+      <tr><td><code>frontend/src/styles.css</code></td><td>Darkroom 主題(與海報一致的暖米 + 香檳金)</td></tr>
+    </tbody>
+  </table>
+
+  <h2><span class="num">4.3</span>Checkpoint 自描述設計</h2>
+  <p>
+    我們將模型 checkpoint 設計為「自描述」格式 — 不僅儲存權重,還包含後續推論所需的所有 metadata:
+  </p>
+
+  <pre data-lang="python"><span class="com"># models/mobilenet_face.pth 的內容結構</span>
+checkpoint = {
+    <span class="str">"state_dict"</span>: model.state_dict(),       <span class="com"># 訓練好的權重</span>
+    <span class="str">"arch"</span>:       <span class="str">"mobilenet_v3_large"</span>,    <span class="com"># 架構名</span>
+    <span class="str">"classes"</span>:    [<span class="str">"Bad"</span>, <span class="str">"Good"</span>],         <span class="com"># 類別順序</span>
+    <span class="str">"img_size"</span>:   <span class="num">224</span>,                       <span class="com"># 輸入尺寸</span>
+    <span class="str">"epoch"</span>:      <span class="num">9</span>,                         <span class="com"># 最佳 epoch</span>
+    <span class="str">"val_acc"</span>:    <span class="num">0.763</span>,                     <span class="com"># 驗證準確率</span>
+    <span class="str">"decision_threshold"</span>: <span class="num">0.47</span>,            <span class="com"># 自動掃出的最佳閾值</span>
+    <span class="str">"test_acc"</span>:   <span class="num">0.751</span>,                     <span class="com"># 獨立 test set 結果</span>
+}</pre>
+
+  <p>
+    這種設計讓系統具備「<b>自我描述</b>」與「<b>向後相容</b>」能力 — 即使未來訓練不同架構或不同類別的模型,推論端不需要任何程式碼修改。
+  </p>
+
+  <div class="page-footer">
+    <span class="brand">Darkroom<span class="dot">.</span></span>
+    <span class="meta">CH 04 · 系統架構 · P. 6</span>
+  </div>
+</div>
+
+<!-- ════════════════ 第五章 ════════════════ -->
+<div class="page">
+  <span class="chapter-tag">CHAPTER 05</span>
+  <h1 class="chapter">
+    <span class="num">05 / DATA ENGINEERING</span>
+    資料工程
+  </h1>
+  <div class="chapter-lead">
+    深度學習有一個著名的公理:「Garbage in, garbage out.」— 資料品質決定模型上限。本章詳述我們的資料蒐集、人臉偵測創新(三層 Fallback)、資料增強與三段切分策略。
+  </div>
+
+  <h2><span class="num">5.1</span>資料蒐集</h2>
+  <p>
+    本研究的資料集由本組成員自行蒐集與標註,來源包括組員自身拍攝的照片、從影片中以 <code>extract_frames.py</code> 擷取的影格,以及部分公開素材。所有照片皆經人工分類為 Good(表情自然)或 Bad(表情崩壞)。最終資料集統計如下:
+  </p>
+
+  <div class="metric-strip">
+    <div class="item" style="--accent: var(--gold);"><div class="v">1,060</div><div class="k">原始照片總數</div></div>
+    <div class="item" style="--accent: var(--sage);"><div class="v">546</div><div class="k">Good(表情自然)</div></div>
+    <div class="item" style="--accent: var(--crimson);"><div class="v">514</div><div class="k">Bad(表情崩壞)</div></div>
+    <div class="item" style="--accent: var(--indigo);"><div class="v">1 : 0.94</div><div class="k">類別比例</div></div>
+  </div>
+
+  <p>
+    類別比例 <b>1 : 0.94</b> 接近完美平衡,避免「模型偷懶,總是預測多數類」的問題。經 MediaPipe 三層 fallback 處理後,實際進入訓練的人臉樣本為 <b>1,293 張</b>(部分照片含多人,每張臉各成獨立樣本)。
+  </p>
+
+  <h2><span class="num">5.2</span>核心創新:三層 Fallback 人臉偵測</h2>
+  <p>
+    在第二版原型中,我們僅使用 MediaPipe full-range model(<code>model_selection=1</code>),導致 <b>27 張照片漏失</b>。深入分析這些失敗案例後,我們將其歸類為三種模式:
+  </p>
+  <ul>
+    <li><b>類型 A — 肖像照與自拍:</b>full-range 模型針對遠距人臉優化,對「臉佔畫面 50% 以上」的近距大臉判斷不佳。</li>
+    <li><b>類型 B — iPhone 螢幕截圖:</b>iPhone Pro 系列橫向截圖尺寸為 2556×1179,但實際內容只在中間區域,兩側為純黑邊。MediaPipe 受黑邊干擾,無法定位人臉。</li>
+    <li><b>類型 C — 極端 edge cases:</b>手蓋住臉、極遠距人物等,任何單一模型都難以處理。</li>
+  </ul>
+
+  <p>對策上,我們設計了三層 fallback 鏈:</p>
+
+  <pre data-lang="python"><span class="kw">def</span> <span class="fn">_detect_largest_face</span>(bgr, min_face_px, margin):
+    <span class="com">"""三層 fallback,逐層降階嘗試。"""</span>
+    primary, fallback = _get_detectors()  <span class="com"># model 0, model 1</span>
+
+    <span class="com"># 第 1 層:short-range model(專長肖像)</span>
+    result = primary.process(bgr_to_rgb(bgr))
+    <span class="kw">if not</span> result.detections:
+        <span class="com"># 第 2 層:full-range model(專長合照中遠距人物)</span>
+        result = fallback.process(bgr_to_rgb(bgr))
+
+    <span class="com"># 第 3 層:裁掉純色 letterbox 邊框後重試</span>
+    <span class="kw">if not</span> result.detections:
+        cropped, (off_x, off_y) = <span class="fn">_crop_letterbox</span>(bgr)
+        <span class="kw">if</span> cropped.shape != bgr.shape:
+            result = primary.process(bgr_to_rgb(cropped))
+            <span class="kw">if not</span> result.detections:
+                result = fallback.process(bgr_to_rgb(cropped))
+
+    <span class="kw">if not</span> result.detections:
+        <span class="kw">raise</span> <span class="fn">NoFaceDetectedError</span>(<span class="str">"三層偵測皆失敗"</span>)
+    <span class="kw">return</span> _expand_bbox(result, margin, off_x, off_y)</pre>
+
+  <p>
+    Letterbox 偵測的核心邏輯:對影像每邊計算<b>標準差</b>,若 std < 8 表示是純色邊框,自動裁掉後再餵 MediaPipe。
+  </p>
+
+  <div class="page-footer">
+    <span class="brand">Darkroom<span class="dot">.</span></span>
+    <span class="meta">CH 05 · 資料工程 · P. 7</span>
+  </div>
+</div>
+
+<!-- ════════════════ 第五章續 ════════════════ -->
+<div class="page">
+  <h2><span class="num">5.3</span>三層 Fallback 的實測結果</h2>
+  <table>
+    <thead><tr><th>偵測配置</th><th>NoFace 漏失</th><th>改善幅度</th><th>備註</th></tr></thead>
+    <tbody>
+      <tr><td>單一模型(model=1)</td><td>27</td><td>baseline</td><td>full-range,漏掉肖像照</td></tr>
+      <tr><td>雙模型 fallback(model 0 + 1)</td><td>8</td><td>−70%</td><td>補回短距離大臉</td></tr>
+      <tr class="best"><td><b>三層 fallback(+ letterbox 裁切)</b></td><td class="gold">3</td><td class="gold">−88.9%</td><td>救回 iPhone 截圖類</td></tr>
+    </tbody>
+  </table>
+
+  <h2><span class="num">5.4</span>資料增強(Data Augmentation)</h2>
+  <p>
+    為了在小資料集條件下提升泛化能力,我們設計了多重資料增強策略,僅應用於訓練集(驗證/測試集保持原始狀態):
+  </p>
+
+  <pre data-lang="python">train_tf = transforms.Compose([
+    <span class="com"># 隨機裁切 + 縮放:模擬不同人臉框大小</span>
+    transforms.<span class="fn">RandomResizedCrop</span>(<span class="num">224</span>, scale=(<span class="num">0.82</span>, <span class="num">1.0</span>), ratio=(<span class="num">0.9</span>, <span class="num">1.1</span>)),
+
+    <span class="com"># 水平翻轉:模擬左右臉差異(50% 機率)</span>
+    transforms.<span class="fn">RandomHorizontalFlip</span>(p=<span class="num">0.5</span>),
+
+    <span class="com"># 隨機旋轉 ±15°:模擬手持拍照的傾斜</span>
+    transforms.<span class="fn">RandomRotation</span>(degrees=<span class="num">15</span>),
+
+    <span class="com"># 色彩擾動:模擬光線、白平衡、膚色差異</span>
+    transforms.<span class="fn">ColorJitter</span>(brightness=<span class="num">0.25</span>, contrast=<span class="num">0.25</span>,
+                           saturation=<span class="num">0.2</span>, hue=<span class="num">0.03</span>),
+
+    transforms.<span class="fn">ToTensor</span>(),
+    transforms.<span class="fn">Normalize</span>(mean=IMAGENET_MEAN, std=IMAGENET_STD),
+
+    <span class="com"># 隨機遮擋:模擬手、頭髮、配件遮住部分臉(20% 機率)</span>
+    transforms.<span class="fn">RandomErasing</span>(p=<span class="num">0.2</span>, scale=(<span class="num">0.02</span>, <span class="num">0.1</span>)),
+])</pre>
+
+  <p>每個增強策略都對應一種真實世界的變異:</p>
+  <ul>
+    <li><b>RandomResizedCrop:</b>使用者上傳的照片中人臉佔比可能差異很大,訓練時隨機裁切讓模型學會「以五官為中心」的特徵。</li>
+    <li><b>RandomRotation ±15°:</b>手持拍照常有輕微傾斜。</li>
+    <li><b>ColorJitter:</b>不同光線、相機、膚色下,色彩分布差異極大。</li>
+    <li><b>RandomErasing:</b>遮擋是真實場景的常態(手指、口罩、太陽眼鏡),隨機塗黑一塊可顯著提升 robust。</li>
+  </ul>
+
+  <h2><span class="num">5.5</span>嚴謹的三段切分(Train / Val / Test)</h2>
+  <p>
+    傳統做法是將資料切為 train / val 兩段,但這在「<b>調超參數時反覆觀察 val 表現</b>」的情境下,可能導致 val acc 虛胖(實際上模型在不知不覺中過擬合到 val set)。為避免此陷阱,我們採用嚴格的三段切分:
+  </p>
+
+  <table>
+    <thead><tr><th>切分</th><th>比例</th><th>用途</th><th>是否影響訓練決策</th></tr></thead>
+    <tbody>
+      <tr><td>Train</td><td>70%</td><td>實際更新權重</td><td>是</td></tr>
+      <tr><td>Validation</td><td>15%</td><td>調超參、選最佳閾值</td><td>是</td></tr>
+      <tr class="best"><td><b>Test</b></td><td>15%</td><td><b>最終評估,只看一次</b></td><td><b>否</b></td></tr>
+    </tbody>
+  </table>
+
+  <p>
+    特別強調:test set 在訓練全程從未被看過、從未用於任何決策。我們僅在最終評估時,用獨立的 <code>evaluate.py</code> 腳本對它跑一次。這確保最終回報的 <b>75.1% test accuracy</b> 是真實的泛化能力。
+  </p>
+
+  <div class="callout sage">
+    <span class="label">研究嚴謹性</span>
+    在前期實驗中,我們的「val 76.3%」其實是經過多次調參後的最佳分數,有可能已輕微過擬合到 val set。但「<b>test 75.1%</b>」是模型在完全沒見過的資料上的表現,這個數字才是真實能力的證據。
+  </div>
+
+  <div class="page-footer">
+    <span class="brand">Darkroom<span class="dot">.</span></span>
+    <span class="meta">CH 05 · 資料工程 · P. 8</span>
+  </div>
+</div>
+
+<!-- ════════════════ 第六章 ════════════════ -->
+<div class="page">
+  <span class="chapter-tag">CHAPTER 06</span>
+  <h1 class="chapter">
+    <span class="num">06 / TRAINING & TUNING</span>
+    模型訓練與調優
+  </h1>
+  <div class="chapter-lead">
+    本章詳述本研究的兩階段微調策略、正則化技術、推論優化,以及最關鍵的 V2 vs V3-Large 對照實驗。
+  </div>
+
+  <h2><span class="num">6.1</span>Two-Stage Fine-Tuning 策略</h2>
+  <p>本研究採取「兩階段微調」策略,逐步釋放模型能力:</p>
+
+  <h3>Stage 1 — 凍結 features,只訓練 classifier head</h3>
+  <p>將 ImageNet 預訓的 backbone 全部凍結,僅訓練自定義的 2 類分類頭。此階段目的是讓 head 適配新任務,而不破壞預訓特徵:</p>
+
+  <pre data-lang="python"><span class="kw">def</span> <span class="fn">build_model</span>():
+    model = <span class="fn">mobilenet_v3_large</span>(weights=MobileNet_V3_Large_Weights.IMAGENET1K_V2)
+    <span class="kw">for</span> p <span class="kw">in</span> model.features.parameters(): p.requires_grad = <span class="kw">False</span>
+    model.classifier = nn.<span class="fn">Sequential</span>(nn.<span class="fn">Dropout</span>(<span class="num">0.2</span>), nn.<span class="fn">Linear</span>(<span class="num">960</span>, <span class="num">2</span>))
+    <span class="kw">return</span> model
+
+optimizer = optim.<span class="fn">Adam</span>(trainable, lr=<span class="num">1e-3</span>, weight_decay=<span class="num">1e-5</span>)
+epochs = <span class="num">15</span></pre>
+
+  <h3>Stage 2 — 解凍最後 3 個 inverted residual blocks</h3>
+  <p>Stage-1 完成後,載入最佳 checkpoint,解凍最後 3 個 blocks(features[14:]),並用<b>更小的學習率</b>(1e-5,Stage-1 的 1/100)繼續訓練。這允許底層特徵也微幅調整,但避免大幅更新破壞預訓知識。</p>
+
+  <h2><span class="num">6.2</span>正則化策略 — 對抗小資料集過擬合</h2>
+  <div class="three-col">
+    <div class="card">
+      <h4 style="color:var(--gold);">Weight Decay 1e-4</h4>
+      <p>L2 正則化,懲罰權重過大,迫使模型學習「簡單的解」而非「死背訓練資料」。</p>
+    </div>
+    <div class="card">
+      <h4 style="color:var(--sage);">Label Smoothing 0.05</h4>
+      <p>不讓模型對任何預測「100% 確定」,正確答案的 one-hot 從 1.0 平滑為 0.95,提升泛化。</p>
+    </div>
+    <div class="card">
+      <h4 style="color:var(--crimson);">Dropout 0.2</h4>
+      <p>Classifier 加入 dropout,訓練時隨機關閉 20% 神經元,避免過度依賴特定特徵。</p>
+    </div>
+  </div>
+
+  <h2><span class="num">6.3</span>推論優化(TTA + 閾值調校)</h2>
+
+  <h3>TTA — 水平翻轉版本平均</h3>
+  <p>將每張測試照片同時餵入「原圖」與「水平翻轉版本」,將兩個預測機率平均,得到更穩定的最終預測:</p>
+
+  <pre data-lang="python"><span class="kw">def</span> <span class="fn">predict_image_quality</span>(image_path):
+    face = <span class="fn">_detect_and_crop_face</span>(image_path)
+    batch = torch.<span class="fn">stack</span>([tf(face), tf(face[:, ::-<span class="num">1</span>, :].<span class="fn">copy</span>())]).<span class="fn">to</span>(device)
+    <span class="kw">with</span> torch.<span class="fn">no_grad</span>():
+        probs = F.<span class="fn">softmax</span>(<span class="fn">model</span>(batch), dim=<span class="num">1</span>).<span class="fn">cpu</span>().<span class="fn">numpy</span>()
+    <span class="kw">return</span> probs.<span class="fn">mean</span>(axis=<span class="num">0</span>)  <span class="com"># 兩版本機率平均</span></pre>
+
+  <h3>決策閾值自動掃描</h3>
+  <p>傳統做法用 0.5 作為「Bad」與「Good」的分界,但這個切點在小資料集上未必最佳。我們在 val set 上掃描 0.30~0.70,找出真正讓 val accuracy 最高的閾值,並寫入 checkpoint。本研究最終掃出最佳閾值為 <b>0.47</b>。</p>
+
+  <div class="page-footer">
+    <span class="brand">Darkroom<span class="dot">.</span></span>
+    <span class="meta">CH 06 · 模型訓練與調優 · P. 9</span>
+  </div>
+</div>
+
+<!-- ════════════════ 第六章續 ════════════════ -->
+<div class="page">
+  <h2><span class="num">6.4</span>架構對比實驗:MobileNetV2 vs V3-Large</h2>
+  <p>
+    為了驗證選用 V3-Large(含 SE Attention)的決定是否正確,我們進行了完整的對照實驗 — 在完全相同的資料、超參數、隨機種子下,分別訓練 V2 與 V3-Large:
+  </p>
+
+  <table>
+    <thead><tr>
+      <th>Backbone</th><th>Stage-1 Val</th><th>Stage-2 Val</th><th>+ Threshold</th><th>Test Acc</th><th>參數量</th>
+    </tr></thead>
+    <tbody>
+      <tr><td>MobileNetV2</td><td>70.6%</td><td>70.6%</td><td>72.3%</td><td>—</td><td>3.5M</td></tr>
+      <tr class="best">
+        <td><b>MobileNetV3-Large</b></td>
+        <td class="gold">73.6%</td>
+        <td>76.3%</td>
+        <td class="gold">76.3%</td>
+        <td class="gold">75.1%</td>
+        <td>5.5M</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <span class="label">關鍵觀察</span>
+    V3-Large 比 V2 在 val accuracy 上提升 <b>+4 個百分點</b>(72.3% → 76.3%)。我們認為主要貢獻來自 <b>SE Attention 模組</b> — 它讓網路自動聚焦於眼睛、嘴角等高資訊區域,正是人臉表情分類最需要的能力。
+  </div>
+
+  <h2><span class="num">6.5</span>訓練曲線</h2>
+  <p>V3-Large 的 stage-1 訓練曲線:</p>
+
+  <pre data-lang="log">[STAGE 1 — 凍結 features,僅訓練 head]
+epoch 01:  train_loss=0.69  acc=0.54  |  val_loss=0.70  acc=0.47
+epoch 02:  train_loss=0.66  acc=0.62  |  val_loss=0.67  acc=0.61  ⭐
+epoch 03:  train_loss=0.64  acc=0.65  |  val_loss=0.64  acc=0.63  ⭐
+epoch 05:  train_loss=0.60  acc=0.71  |  val_loss=0.61  acc=0.64
+epoch 09:  train_loss=0.57  acc=0.74  |  val_loss=0.57  acc=0.76  ⭐ saved
+epoch 12:  train_loss=0.58  acc=0.71  |  val_loss=0.58  acc=0.70
+epoch 15:  train_loss=0.57  acc=0.72  |  val_loss=0.58  acc=0.68
+[done] best val_acc=0.736 @ epoch 9
+
+[THRESHOLD SCAN]
+最佳 P(Bad) 閾值 = 0.47(取代死板的 0.5)
+val_acc @ 0.47 = 0.763
+
+[TEST]
+獨立 test set acc = 0.751 (n=193)</pre>
+
+  <h2><span class="num">6.6</span>訓練成本</h2>
+  <p>
+    所有訓練在 MacBook 上使用 PyTorch MPS 後端完成,無外接 GPU。整套訓練流程(Stage-1 + Stage-2 + 閾值掃描)在合理時間內可重現,符合「本機運行」的設計原則。
+  </p>
+
+  <div class="page-footer">
+    <span class="brand">Darkroom<span class="dot">.</span></span>
+    <span class="meta">CH 06 · 模型訓練與調優 · P. 10</span>
+  </div>
+</div>
+
+<!-- ════════════════ 第七章 ════════════════ -->
+<div class="page">
+  <span class="chapter-tag">CHAPTER 07</span>
+  <h1 class="chapter">
+    <span class="num">07 / EVALUATION</span>
+    評估與結果
+  </h1>
+  <div class="chapter-lead">
+    本章呈現完整評估結果 — 我們不滿足於單一 accuracy,而是透過 confusion matrix、per-class P/R/F1、與錯誤案例分析,全面理解模型能力邊界。
+  </div>
+
+  <h2><span class="num">7.1</span>核心指標(Test Set, n = 193)</h2>
+  <div class="metric-strip">
+    <div class="item" style="--accent: var(--gold);"><div class="v">75.1%</div><div class="k">Overall Accuracy</div></div>
+    <div class="item" style="--accent: var(--crimson);"><div class="v">0.828</div><div class="k">Bad Recall</div></div>
+    <div class="item" style="--accent: var(--sage);"><div class="v">0.787</div><div class="k">Good Precision</div></div>
+    <div class="item" style="--accent: var(--indigo);"><div class="v">0.749</div><div class="k">Macro F1</div></div>
+  </div>
+
+  <h2><span class="num">7.2</span>Confusion Matrix 分析</h2>
+  <p>對 193 張測試樣本,模型輸出與真實標籤的對照表:</p>
+
+  <table>
+    <thead><tr><th></th><th>預測 Bad</th><th>預測 Good</th><th>類別總數</th></tr></thead>
+    <tbody>
+      <tr><td><b>真實 Bad</b></td><td class="best"><b>82 (TP)</b></td><td>17 (FN)</td><td>99</td></tr>
+      <tr><td><b>真實 Good</b></td><td>31 (FP)</td><td class="best"><b>63 (TN)</b></td><td>94</td></tr>
+    </tbody>
+  </table>
+
+  <ul>
+    <li><b>TP = 82</b>:正確找出 82 張廢片 → 系統真的有用;<b>FN = 17</b>:漏掉 17 張(比例已大幅降低)。</li>
+    <li><b>FP = 31</b>:誤判 31 張 Good 為 Bad(使用者透過 UI 勾選機制可撤回);<b>TN = 63</b>:正確留下 63 張 Good。</li>
+  </ul>
+
+  <table>
+    <thead><tr><th>類別</th><th>Precision</th><th>Recall</th><th>F1-score</th><th>Support</th></tr></thead>
+    <tbody>
+      <tr><td>Bad</td><td>0.726</td><td class="crimson">0.828</td><td>0.774</td><td>99</td></tr>
+      <tr><td>Good</td><td class="sage">0.787</td><td>0.670</td><td>0.724</td><td>94</td></tr>
+      <tr class="best"><td><b>Macro Avg</b></td><td><b>0.757</b></td><td><b>0.749</b></td><td><b>0.749</b></td><td><b>193</b></td></tr>
+    </tbody>
+  </table>
+
+  <h2><span class="num">7.3</span>對清理工具場景的指標解讀</h2>
+  <div class="two-col">
+    <div class="callout crimson">
+      <span class="label">Bad Recall = 0.828</span>
+      <b>「廢片抓對率」 — 真實廢片中,有 82.8% 被模型成功識別。</b><br>
+      意義:模型不太會漏網,適合廢片清理場景。
+    </div>
+    <div class="callout sage">
+      <span class="label">Good Precision = 0.787</span>
+      <b>「自然度判定可信度」 — 模型說「這張 Good」時,78.7% 是真的 Good。</b><br>
+      意義:被歸到 Good 的照片較可信。
+    </div>
+  </div>
+
+  <p>
+    這兩個指標共同保障了使用者的體驗:<b>該抓的有抓到,該留的有留住</b>。即使 Good Recall 偏低(0.670),使用者透過 UI 的「勾選確認」流程仍可輕易撤回誤判。
+  </p>
+
+  <h2><span class="num">7.4</span>錯誤案例分析</h2>
+  <p>我們撰寫了 <code>evaluate.py</code> 自動找出「最自信卻錯了」的 top 樣本:</p>
+
+  <table>
+    <thead><tr><th>真實</th><th>預測</th><th>信心</th><th>觀察</th></tr></thead>
+    <tbody>
+      <tr><td>Good</td><td class="crimson">Bad</td><td>89.2%</td><td>嚴肅但自然的表情(被誤判)</td></tr>
+      <tr><td>Bad</td><td class="sage">Good</td><td>86.1%</td><td>輕微閉眼但難以察覺</td></tr>
+      <tr><td>Bad</td><td class="sage">Good</td><td>78.3%</td><td>嘴角微歪的笑容</td></tr>
+      <tr><td>Good</td><td class="crimson">Bad</td><td>74.9%</td><td>合照次要人物,表情自然但較小</td></tr>
+      <tr><td>Good</td><td class="crimson">Bad</td><td>72.9%</td><td>側臉照(訓練資料較少)</td></tr>
+    </tbody>
+  </table>
+
+  <div class="page-footer">
+    <span class="brand">Darkroom<span class="dot">.</span></span>
+    <span class="meta">CH 07 · 評估與結果 · P. 11</span>
+  </div>
+</div>
+
+<!-- ════════════════ 第八章 ════════════════ -->
+<div class="page">
+  <span class="chapter-tag">CHAPTER 08</span>
+  <h1 class="chapter">
+    <span class="num">08 / IMPLEMENTATION</span>
+    系統實作與 UI 設計
+  </h1>
+  <div class="chapter-lead">
+    本系統採「<b>前後端分離</b>」架構:<b>FastAPI</b> 後端封裝模型推論與檔案操作,以 REST API 形式對外;<b>Vue 3 + Vite</b> 前端負責互動與視覺。本章說明 API 設計、Vue 組件結構、軟刪除機制與 Darkroom 視覺識別。
+  </div>
+
+  <h2><span class="num">8.1</span>架構選擇 — 為什麼前後端分離</h2>
+  <p>
+    開發初期我們以 <b>Streamlit</b> 快速搭建原型,優點是「全 Python、瞬間出 UI」。但當資料集擴大到 1,000+ 照片後,Streamlit 的「<b>任何 widget 互動都 rerun 整個 script</b>」架構造成明顯卡頓 — 切 tab、勾 checkbox 都會重新渲染所有元件。
+  </p>
+  <p>
+    我們因此將前端重寫為 <b>Vue 3 + Vite</b>,後端維持 Python 但封裝為 <b>FastAPI</b> 服務。差異對比:
+  </p>
+
+  <table>
+    <thead><tr><th>面向</th><th>Streamlit(v1)</th><th>FastAPI + Vue 3(v2)</th></tr></thead>
+    <tbody>
+      <tr><td>互動模型</td><td>Server-side rerun</td><td>Client-side reactive(只 diff)</td></tr>
+      <tr><td>切 Tab</td><td>整頁重建</td><td>純 CSS 切換,瞬間</td></tr>
+      <tr><td>勾 Checkbox</td><td>需 fragment 才能不卡</td><td>單張卡片更新</td></tr>
+      <tr><td>圖片載入</td><td>Base64 內嵌 HTML</td><td>HTTP 圖片 + 瀏覽器快取</td></tr>
+      <tr><td>佈署</td><td>單一 process</td><td>後端 API + 前端 SPA(可同源)</td></tr>
+    </tbody>
+  </table>
+
+  <h2><span class="num">8.2</span>後端設計 — FastAPI REST API</h2>
+  <p>後端以 <code>backend/main.py</code> 為唯一入口,所有 endpoint 集中管理:</p>
+
+  <table>
+    <thead><tr><th>Endpoint</th><th>用途</th></tr></thead>
+    <tbody>
+      <tr><td><code>GET /api/health</code></td><td>健康檢查 + 確認模型載入</td></tr>
+      <tr><td><code>POST /api/scan</code></td><td>啟動掃描,回傳 <code>job_id</code></td></tr>
+      <tr><td><code>GET /api/scan/{job_id}</code></td><td>查詢進度與結果(前端輪詢)</td></tr>
+      <tr><td><code>GET /api/image?path=&amp;w=200</code></td><td>縮圖服務,server-side resize + 快取</td></tr>
+      <tr><td><code>GET /api/face/{face_id}</code></td><td>AI 裁切的人臉縮圖</td></tr>
+      <tr><td><code>POST /api/trash</code></td><td>軟刪除,寫入 manifest.json</td></tr>
+      <tr><td><code>GET /api/trash?folder=</code></td><td>列出 Trash 內容</td></tr>
+      <tr><td><code>POST /api/trash/restore</code></td><td>選擇性還原(可單張、可全部)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>非同步掃描設計</h3>
+  <p>掃描可能耗時數十秒到數分鐘。POST <code>/api/scan</code> 立即回傳 job_id 並在背景 thread 執行;前端每 500ms 輪詢進度,UI 不阻塞:</p>
+
+  <pre data-lang="python"><span class="com"># backend/main.py — 啟動掃描 (節錄)</span>
+<span class="kw">@app.post</span>(<span class="str">"/api/scan"</span>)
+<span class="kw">def</span> <span class="fn">start_scan</span>(req: ScanRequest):
+    job_id = uuid.<span class="fn">uuid4</span>().<span class="fn">hex</span>[:<span class="num">12</span>]
+    JOBS[job_id] = {<span class="str">"status"</span>: <span class="str">"running"</span>, <span class="str">"current"</span>: <span class="num">0</span>, <span class="str">"total"</span>: <span class="num">0</span>}
+    <span class="fn">Thread</span>(target=_run_scan_job, args=(job_id, folder), daemon=<span class="kw">True</span>).<span class="fn">start</span>()
+    <span class="kw">return</span> {<span class="str">"job_id"</span>: job_id}
+
+<span class="kw">@app.get</span>(<span class="str">"/api/scan/{job_id}"</span>)
+<span class="kw">def</span> <span class="fn">get_scan</span>(job_id: <span class="fn">str</span>):
+    <span class="kw">return</span> JOBS.<span class="fn">get</span>(job_id) <span class="kw">or</span> <span class="fn">HTTPException</span>(<span class="num">404</span>)</pre>
+
+  <div class="page-footer">
+    <span class="brand">Darkroom<span class="dot">.</span></span>
+    <span class="meta">CH 08 · 系統實作與 UI 設計 · P. 12</span>
+  </div>
+</div>
+
+<!-- ════════════════ 第八章續 ════════════════ -->
+<div class="page">
+  <h2><span class="num">8.3</span>前端設計 — Vue 3 SPA</h2>
+  <p>
+    前端使用 <b>Vue 3 Composition API</b> 與 <code>reactive()</code> 全局狀態,以 Single File Component 切分:
+  </p>
+
+  <table>
+    <thead><tr><th>組件</th><th>職責</th></tr></thead>
+    <tbody>
+      <tr><td><code>App.vue</code></td><td>根組件,管理全局狀態(viewMode / scanResults 等),provide 給子組件</td></tr>
+      <tr><td><code>Sidebar.vue</code></td><td>左側控制面板:路徑輸入、啟動掃描、Trash 入口</td></tr>
+      <tr><td><code>WelcomePage.vue</code></td><td>歡迎頁:Hero、使用流程、分類規則</td></tr>
+      <tr><td><code>ScanProgress.vue</code></td><td>掃描中央進度卡,即時顯示 ETA 與當前檔名</td></tr>
+      <tr><td><code>ResultsView.vue</code></td><td>三分頁結果 + 分頁 + 卡片網格 + 軟刪除動作</td></tr>
+      <tr><td><code>TrashView.vue</code></td><td>Trash 視圖 + 選擇性還原</td></tr>
+    </tbody>
+  </table>
+
+  <h3>UX 效能最佳化</h3>
+  <ul>
+    <li><b>Server-side 縮圖快取</b>:Pillow 即時 resize,以 <code>MD5(path + mtime + width)</code> 為 key 快取,同一張 URL 第二次以後直接命中。</li>
+    <li><b>瀏覽器 lazy loading</b>:<code>&lt;img loading="lazy"&gt;</code>,捲動到才下載,即使 500+ 張也不卡。</li>
+    <li><b>HTTP 原生快取</b>:相同的圖片 URL 由瀏覽器自動快取,翻頁回頭看不需重抓。</li>
+    <li><b>分頁渲染</b>:預設每頁 30 張,使用者可選 15/30/60/120。</li>
+  </ul>
+
+  <h2><span class="num">8.4</span>軟刪除與還原機制</h2>
+  <p>「<b>怕刪錯</b>」是設計考量的核心痛點之一。我們設計了「軟刪除 + manifest 追蹤」機制,讓刪除動作完全可逆:</p>
+
+  <pre data-lang="python"><span class="com"># backend/main.py — 軟刪除流程</span>
+<span class="kw">@app.post</span>(<span class="str">"/api/trash"</span>)
+<span class="kw">def</span> <span class="fn">move_to_trash</span>(req: TrashRequest):
+    trash_dir = <span class="fn">Path</span>(req.folder) / <span class="str">"Trash"</span>
+    trash_dir.<span class="fn">mkdir</span>(exist_ok=<span class="kw">True</span>)
+    manifest = []
+    <span class="kw">for</span> path_str <span class="kw">in</span> req.paths:
+        src = <span class="fn">Path</span>(path_str)
+        dest = trash_dir / src.name
+        <span class="kw">if</span> dest.<span class="fn">exists</span>():  <span class="com"># 避免覆蓋</span>
+            dest = trash_dir / <span class="fn">f</span><span class="str">"{src.stem}_{timestamp}{src.suffix}"</span>
+        shutil.<span class="fn">move</span>(<span class="fn">str</span>(src), <span class="fn">str</span>(dest))
+        manifest.<span class="fn">append</span>({
+            <span class="str">"original_path"</span>: <span class="fn">str</span>(src),
+            <span class="str">"trash_path"</span>:    <span class="fn">str</span>(dest),
+            <span class="str">"deleted_at"</span>:    datetime.<span class="fn">now</span>().<span class="fn">isoformat</span>(),
+        })
+    <span class="com"># 追加到既有的 manifest.json</span>
+    _append_manifest(trash_dir / <span class="str">"manifest.json"</span>, manifest)
+    <span class="kw">return</span> {<span class="str">"moved"</span>: <span class="fn">len</span>(manifest)}</pre>
+
+  <h3>選擇性還原</h3>
+  <p>
+    使用者可在 Trash 視圖中**勾選想還原的照片**,後端依 trash_paths 過濾;沒勾選的繼續留在 Trash:
+  </p>
+
+  <pre data-lang="python"><span class="kw">@app.post</span>(<span class="str">"/api/trash/restore"</span>)
+<span class="kw">def</span> <span class="fn">restore_from_trash</span>(req: RestoreRequest):
+    target_set = <span class="fn">set</span>(req.trash_paths <span class="kw">or</span> [])  <span class="com"># 空 = 全部還原</span>
+    <span class="kw">for</span> entry <span class="kw">in</span> manifest:
+        <span class="kw">if</span> target_set <span class="kw">and</span> entry[<span class="str">"trash_path"</span>] <span class="kw">not in</span> target_set:
+            <span class="fn">remaining</span>.<span class="fn">append</span>(entry)
+            <span class="kw">continue</span>
+        shutil.<span class="fn">move</span>(entry[<span class="str">"trash_path"</span>], entry[<span class="str">"original_path"</span>])
+    _write_manifest(manifest_file, remaining)</pre>
+
+  <div class="page-footer">
+    <span class="brand">Darkroom<span class="dot">.</span></span>
+    <span class="meta">CH 08 · 系統實作與 UI 設計 · P. 13</span>
+  </div>
+</div>
+
+<!-- ════════════════ 第八章續 (P.14) ════════════════ -->
+<div class="page">
+  <h2><span class="num">8.5</span>Darkroom 視覺識別系統</h2>
+  <p>我們為這個系統設計了「暗房攝影師」主題的視覺識別,理由有三:</p>
+  <ul>
+    <li><b>呼應產品意象:</b>「暗房」是傳統攝影師挑選底片、選出最佳作品的工作場域,精準對應本工具「協助挑選」的核心功能。</li>
+    <li><b>差異化:</b>多數 SaaS 工具走「乾淨白底 + 藍色按鈕」的路線,Darkroom 的暖色調 + 香檳金讓品牌一眼就被記住。</li>
+    <li><b>專業感:</b>對攝影愛好者熟悉的 Lightroom、Capture One 等專業工具,Darkroom 的視覺語言相近。</li>
+  </ul>
+
+  <p><b>核心設計 token(海報、報告、Web UI 三者完全一致):</b></p>
+  <table>
+    <thead><tr><th>角色</th><th>色碼 / 字型</th><th>使用情境</th></tr></thead>
+    <tbody>
+      <tr><td><b>主色</b></td><td>香檳金 #a67632</td><td>品牌標、章節編號、強調文字、按鈕</td></tr>
+      <tr><td><b>警示色</b></td><td>暗房紅 #b03a30</td><td>Bad 分頁、軟刪除按鈕、廢片標籤</td></tr>
+      <tr><td><b>通過色</b></td><td>橄欖綠 #5d8a3c</td><td>Good 分頁、成功狀態</td></tr>
+      <tr><td><b>背景</b></td><td>暖米黃 #faf6ea + 白色卡片</td><td>整體底色 + 內容卡片陰影</td></tr>
+      <tr><td><b>字型</b></td><td>Noto Sans TC + Noto Serif TC</td><td>內文 / 品牌標(Darkroom.)</td></tr>
+      <tr><td><b>等寬字</b></td><td>JetBrains Mono</td><td>章節編號、代碼、metadata</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <span class="label">DESIGN CONSISTENCY</span>
+    <b>海報、報告、Web UI 三者共用同一套 design token</b> — 從色碼到字型完全一致。當使用者從專案網頁、海報、報告三個媒介接觸到 Darkroom 時,視覺記憶會被同一個品牌系統強化,而非被切割成三個獨立的設計。
+  </div>
+
+  <div class="page-footer">
+    <span class="brand">Darkroom<span class="dot">.</span></span>
+    <span class="meta">CH 08 · 系統實作與 UI 設計 · P. 14</span>
+  </div>
+</div>
+
+<!-- ════════════════ 第九章 ════════════════ -->
+<div class="page">
+  <span class="chapter-tag">CHAPTER 09</span>
+  <h1 class="chapter">
+    <span class="num">09 / REFLECTION</span>
+    反思與限制
+  </h1>
+  <div class="chapter-lead">
+    沒有完美的系統。本章誠實面對本研究的限制,並反思開發過程中的關鍵領悟。我們相信,認識自己的邊界,才有可能突破它。
+  </div>
+
+  <h2><span class="num">9.1</span>學到的事</h2>
+
+  <h3>(1) 資料的價值大於模型</h3>
+  <p>
+    在前期實驗中,我們不斷嘗試「換更大的模型」、「加更多 epoch」、「調更花俏的超參數」,但 val accuracy 始終卡在 70-72%。讓我們突破到 75.1% 的關鍵,是把資料集從較少張擴增到 1,060 張,並更嚴格地檢視類別平衡。此經驗讓我們體會「<b>Data-centric AI</b>」 — 當模型已經夠好,投資在資料品質上的回報遠高於投資在模型架構上。
+  </p>
+
+  <h3>(2) 評估嚴謹性是真實能力的證據</h3>
+  <p>
+    引入嚴格的 train / val / test 三段切分後,雖然「report 出來的數字」變小(75.1%),但這個數字是真實的,我們對它有信心。研究的價值在於誠實,不在於漂亮數字。
+  </p>
+
+  <h3>(3) 失敗案例帶來最大的工程突破</h3>
+  <p>
+    本研究最關鍵的創新 — 三層 Fallback 偵測 — 並非來自高深的演算法,而是來自<b>對失敗案例的詳細觀察</b>。「為什麼模型抓不到這 27 張?」這個問題,引導我們發現 iPhone 截圖的黑邊現象,進而設計出輕量的 letterbox 偵測。
+  </p>
+
+  <h2><span class="num">9.2</span>系統限制</h2>
+  <table>
+    <thead><tr><th>限制</th><th>影響</th><th>暫無解 / 未來方向</th></tr></thead>
+    <tbody>
+      <tr><td>訓練資料規模小</td><td>準確率天花板約 80%</td><td>加更多資料是唯一根本解</td></tr>
+      <tr><td>族群多元性不足</td><td>對訓練資料分布之外的人臉可能表現較弱</td><td>擴增更多元的資料集</td></tr>
+      <tr><td>「廢片」主觀性高</td><td>標註者間可能有意見不一致</td><td>需要更明確的標註指南</td></tr>
+      <tr><td>極端 edge case 仍漏</td><td>3 張電視截圖等仍無法偵測</td><td>需要更強的 face detector</td></tr>
+      <tr><td>無連拍智選功能</td><td>不能從 10 張連拍中選最佳</td><td>需要 EXIF 整合 + 群組推薦演算法</td></tr>
+    </tbody>
+  </table>
+
+  <h2><span class="num">9.3</span>倫理考量</h2>
+
+  <h3>(1) 隱私保護</h3>
+  <p>
+    本系統<b>完全本機運行</b>,使用者的照片不會上傳任何雲端,這是設計原則而非妥協。對於含家庭、私密照片的使用者特別重要。我們也未在程式中加入任何分析、追蹤、上傳行為。
+  </p>
+
+  <h3>(2) 演算法偏見(Algorithmic Bias)</h3>
+  <p>
+    我們的訓練資料來源有限,模型對訓練資料之外的族群、場景、光線條件,可能有未驗證的偏差。我們在 README 與報告中明確揭露此限制,並建議使用者在多元場景下需謹慎驗證。
+  </p>
+
+  <h3>(3) 「廢片」定義權</h3>
+  <p>
+    什麼算「廢片」是高度個人化的 — 對某人「閉眼」可能是廢片,對另一人卻可能是珍貴的回憶。我們的系統設計為「<b>AI 建議,使用者最終決定</b>」 — 每張被歸到 Bad 的照片都需要使用者手動勾選才會被刪除,且軟刪除機制讓決定隨時可撤回。這保障了使用者的「<b>數位自主權</b>」。
+  </p>
+
+  <div class="page-footer">
+    <span class="brand">Darkroom<span class="dot">.</span></span>
+    <span class="meta">CH 09 · 反思與限制 · P. 14</span>
+  </div>
+</div>
+
+<!-- ════════════════ 第十章 ════════════════ -->
+<div class="page">
+  <span class="chapter-tag">CHAPTER 10</span>
+  <h1 class="chapter">
+    <span class="num">10 / CONCLUSION</span>
+    結論與未來展望
+  </h1>
+  <div class="chapter-lead">
+    本研究實作了一套完整的人臉表情品質自動評估系統,從資料蒐集、模型訓練、嚴謹評估到 Web UI 部署,體現「設計思考 × 人工智慧」的學習成果。
+  </div>
+
+  <h2><span class="num">10.1</span>研究貢獻總結</h2>
+
+  <div class="three-col">
+    <div class="card">
+      <h4 style="color:var(--gold);">技術貢獻</h4>
+      <ul>
+        <li>提出三層 fallback 人臉偵測架構,改善 88.9%</li>
+        <li>完整 two-stage fine-tuning + 正則化 pipeline</li>
+        <li>對照實驗驗證 SE Attention 對人臉任務的價值</li>
+        <li>嚴謹 train / val / test 三段評估</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4 style="color:var(--sage);">產品貢獻</h4>
+      <ul>
+        <li>端到端 Web UI,可立即使用</li>
+        <li>軟刪除 + 還原機制,降低使用者焦慮</li>
+        <li>本機運行,完全離線保護隱私</li>
+        <li>透明的信心分布視覺化</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4 style="color:var(--crimson);">學習貢獻</h4>
+      <ul>
+        <li>從具體痛點出發,完成完整原型迭代</li>
+        <li>展現「Data-centric AI」思維</li>
+        <li>誠實面對限制與偏見</li>
+        <li>跨領域(會計、統計、歐法、廣電)協作</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2><span class="num">10.2</span>未來方向</h2>
+  <ol>
+    <li><b>資料擴增至 2,000+ 樣本:</b>突破 80% accuracy 天花板的最直接方式。重點補足側臉、合照次要人物、多元族群。</li>
+    <li><b>連拍智選最佳功能:</b>結合 EXIF 時間戳,自動將拍攝時間 ±2 秒的照片分組,在組內保留信心最高的 Good 照片。這是真正的差異化功能,既有工具都做不到。</li>
+    <li><b>桌面 App 打包:</b>用 PyInstaller 或 Electron 打包成 .app / .exe,讓非技術使用者也能受益,無需在終端機執行指令。</li>
+    <li><b>使用者標註回饋機制:</b>當模型判錯時,讓使用者點「實際上是 Good/Bad」,累積真實使用回饋資料,持續改進模型 — 這是 ML 產品的標準資料飛輪(Data Flywheel)。</li>
+    <li><b>多語言介面:</b>目前 UI 為繁體中文,可擴增至英文、日文,觸及國際使用者。</li>
+  </ol>
+
+  <h2><span class="num">10.3</span>結語</h2>
+  <p>
+    從一個日常的痛點出發,到實作完整的 Python 程式碼、訓練自己的深度學習模型、設計完整 Web UI,本團隊 5 位來自會計、統計、歐法、廣電 4 個系所的同學,以跨領域協作的方式完成這個專案。
+  </p>
+  <p>
+    過程中我們深刻體會到:「<b>AI 不是替代人類做決定的工具,而是讓人類更有餘裕做重要決定的工具</b>」。我們希望這個系統,能讓使用者把節省下來的整理時間,用在<b>真正享受相簿裡那些值得珍藏的瞬間</b>。
+  </p>
+
+  <div class="callout sage">
+    <span class="label">原始碼</span>
+    <b>本專案開源</b> · MIT License · 歡迎社群貢獻與延伸應用
+  </div>
+
+  <div class="page-footer">
+    <span class="brand">Darkroom<span class="dot">.</span></span>
+    <span class="meta">CH 10 · 結論與未來展望 · P. 15</span>
+  </div>
+</div>
+
+<!-- ════════════════ 參考文獻 ════════════════ -->
+<div class="page refs">
+  <span class="chapter-tag">REFERENCES</span>
+  <h1 class="chapter">
+    <span class="num">REFERENCES</span>
+    參考文獻
+  </h1>
+  <div class="chapter-lead">
+    本研究援引的學術文獻與技術文件。
+  </div>
+
+  <h3>核心技術文獻</h3>
+  <ol>
+    <li>Howard, A., Sandler, M., Chu, G., Chen, L.-C., Chen, B., Tan, M., et al. (2019). <i>Searching for MobileNetV3.</i> Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV), 1314-1324.</li>
+    <li>Hu, J., Shen, L., &amp; Sun, G. (2018). <i>Squeeze-and-Excitation Networks.</i> Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR), 7132-7141.</li>
+    <li>Sandler, M., Howard, A., Zhu, M., Zhmoginov, A., &amp; Chen, L.-C. (2018). <i>MobileNetV2: Inverted Residuals and Linear Bottlenecks.</i> CVPR, 4510-4520.</li>
+    <li>Bazarevsky, V., Kartynnik, Y., Vakunov, A., Raveendran, K., &amp; Grundmann, M. (2019). <i>BlazeFace: Sub-millisecond Neural Face Detection on Mobile GPUs.</i> CVPR Workshop on Computer Vision for Augmented and Virtual Reality.</li>
+    <li>Deng, J., Dong, W., Socher, R., Li, L.-J., Li, K., &amp; Fei-Fei, L. (2009). <i>ImageNet: A Large-Scale Hierarchical Image Database.</i> CVPR, 248-255.</li>
+  </ol>
+
+  <h3>遷移學習與訓練技巧</h3>
+  <ol start="6">
+    <li>Yosinski, J., Clune, J., Bengio, Y., &amp; Lipson, H. (2014). <i>How transferable are features in deep neural networks?</i> Advances in Neural Information Processing Systems (NeurIPS), 27.</li>
+    <li>Szegedy, C., Vanhoucke, V., Ioffe, S., Shlens, J., &amp; Wojna, Z. (2016). <i>Rethinking the Inception Architecture for Computer Vision.</i> CVPR, 2818-2826. (Label Smoothing 出處)</li>
+    <li>Loshchilov, I., &amp; Hutter, F. (2019). <i>Decoupled Weight Decay Regularization.</i> International Conference on Learning Representations (ICLR).</li>
+  </ol>
+
+  <h3>AI 倫理與資料思維</h3>
+  <ol start="9">
+    <li>Buolamwini, J., &amp; Gebru, T. (2018). <i>Gender Shades: Intersectional Accuracy Disparities in Commercial Gender Classification.</i> Proceedings of Machine Learning Research, 81, 77-91.</li>
+    <li>Ng, A. (2021). <i>A Chat with Andrew on MLOps: From Model-centric to Data-centric AI.</i> DeepLearning.AI.</li>
+  </ol>
+
+  <h3>工具與框架</h3>
+  <ol start="11">
+    <li>Paszke, A., et al. (2019). <i>PyTorch: An Imperative Style, High-Performance Deep Learning Library.</i> NeurIPS, 32.</li>
+    <li>Lugaresi, C., et al. (2019). <i>MediaPipe: A Framework for Building Perception Pipelines.</i> arXiv:1906.08172.</li>
+    <li>Streamlit Inc. (2024). <i>Streamlit Documentation.</i> https://docs.streamlit.io</li>
+  </ol>
+
+  <div class="page-footer">
+    <span class="brand">Darkroom<span class="dot">.</span></span>
+    <span class="meta">REFERENCES · P. 16</span>
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,14 @@
+Model: models/mobilenet_face.pth
+Arch:  mobilenet_v3_large
+Threshold (P(Bad)): 0.440
+Test n: 193
+
+              precision    recall  f1-score   support
+
+         Bad      0.726     0.828     0.774        99
+        Good      0.787     0.670     0.724        94
+
+    accuracy                          0.751       193
+   macro avg      0.757     0.749     0.749       193
+weighted avg      0.756     0.751     0.750       193
+
