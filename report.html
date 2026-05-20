@@ -321,24 +321,24 @@ table .best td { color: var(--ink); }
     Abstract
   </h1>
   <div class="chapter-lead">
-    本研究設計並實作一套基於遷移學習的人臉表情品質自動評估系統,協助使用者從相簿中挑出表情崩壞的廢片(閉眼、嘴歪、模糊),並整合人臉偵測創新與嚴謹評估流程。
+    這個專案做的事很簡單說：自動幫你找出相簿裡「表情崩壞」的照片（閉眼、嘴歪、模糊），讓你一鍵清理，不用再一張張手動翻看。
   </div>
 
   <p>
-    在數位攝影時代,每人每天產出大量照片,其中夾雜許多廢片(<b>閉眼、嘴歪、模糊</b>),手動逐張篩選耗時冗長。既有相簿軟體僅能做品質粗篩(模糊、過曝偵測),<b>無法判斷「表情品質」</b>這個高階語意。本研究以遷移學習為核心,在 1,060 張自建資料集上,自訓 MobileNetV3-Large(含 Squeeze-and-Excitation Attention)神經網路,並開發 Streamlit Web UI 讓使用者<b>本機運行、完全離線</b>地批次清理相簿。
+    在數位攝影時代,每人每天產出大量照片,其中夾雜許多廢片（<b>閉眼、嘴歪、模糊</b>），手動逐張篩選耗時冗長。既有相簿軟體僅能做品質粗篩（模糊、過曝偵測），<b>無法判斷「表情品質」</b>這個更貼近使用者真正在乎的層次。本研究以遷移學習（Transfer Learning，用大型已訓好的 AI 作為起點，不從零開始）為核心，在 1,060 張自建資料集上，自訓 MobileNetV3-Large（一種由 Google 設計的輕量神經網路）神經網路，並開發 Web UI（瀏覽器操作界面）讓使用者<b>本機運行、完全離線</b>地批次清理相簿。
   </p>
   <p>
-    在資料工程上,我們提出「<span class="gold">三層 Fallback</span>」人臉偵測策略:整合 MediaPipe short-range model、full-range model,以及自行設計的 <b>letterbox 自動裁切</b>機制(處理 iPhone 螢幕截圖的純色邊框),將漏失率從 27 張大幅降至 3 張(<b>改善 88.9%</b>)。在訓練流程上,採用兩階段微調(凍結特徵 → 解凍最後 3 個 inverted residual blocks),搭配 Weight Decay、Label Smoothing、RandomResizedCrop、RandomErasing 等正則化與資料增強策略,並透過 Test-Time Augmentation 與決策閾值自動掃描優化推論。
+    在資料工程上，我們提出「<span class="gold">三層 Fallback</span>」人臉偵測策略：整合 MediaPipe（Google 開源的人臉偵測工具）short-range model、full-range model，以及自行設計的 <b>letterbox 自動裁切</b>機制（處理 iPhone 螢幕截圖的純色邊框），將漏失率從 27 張大幅降至 3 張（<b>改善 88.9%</b>）。在訓練流程上，採用兩階段微調（先凍結 AI 舊知識只教新分類，再小心解凍微調），搭配多種防止「死背訓練資料」的技巧，並透過 Test-Time Augmentation（讓模型看同一張照片兩次取平均）與決策閾值自動掃描優化推論。
   </p>
   <p>
-    在嚴謹評估上,採 70 / 15 / 15 train / val / test 三段切分,於獨立 test set(n=193)達 <b>75.1% accuracy</b>,Bad 類 recall <b>0.828</b>(廢片偵測成功率高),證明系統具備實際使用價值。我們也對比 MobileNetV2 與 V3-Large,驗證 SE Attention 對人臉細粒度任務的價值(<b>+4 個百分點</b>)。
+    在嚴謹評估上，採 70 / 15 / 15 train / val / test 三段切分（訓練／模擬考／正式考），於獨立 test set（n=193）達 <b>75.1% accuracy（準確率）</b>，Bad 類 recall（召回率，廢片偵測成功率）<b>0.828</b>，代表真正的壞照片裡有超過八成都被系統找到了，證明系統具備實際使用價值。我們也對比 MobileNetV2 與 V3-Large，驗證 SE Attention（一種讓 AI 知道「重點看哪裡」的機制）對人臉細粒度任務的價值（<b>+4 個百分點</b>）。
   </p>
 
   <div class="callout">
     <span class="label">研究貢獻</span>
-    (1) 提出三層 fallback 人臉偵測架構,解決 iPhone 截圖等 edge cases;
-    (2) 完整呈現遷移學習 + 兩階段微調流程,並以對照實驗驗證架構選型;
-    (3) 整合端到端 Web UI,具備軟刪除、還原、視覺化等實際可用功能。
+    (1) 提出三層 fallback 人臉偵測架構，解決 iPhone 截圖等特殊情況；
+    (2) 完整呈現遷移學習 + 兩階段微調流程，並以對照實驗驗證架構選型；
+    (3) 整合端到端 Web UI（瀏覽器操作界面），具備軟刪除、還原、視覺化等實際可用功能。
   </div>
 </div>
 
@@ -480,7 +480,7 @@ table .best td { color: var(--ink); }
       <tr>
         <td><b>降低操作門檻</b></td>
         <td>非技術使用者不熟悉指令列</td>
-        <td>Streamlit Web UI,瀏覽器即可使用,無需安裝額外軟體</td>
+        <td>Web UI（瀏覽器操作界面），瀏覽器即可使用，無需安裝額外軟體</td>
       </tr>
     </tbody>
   </table>
@@ -521,28 +521,28 @@ table .best td { color: var(--ink); }
     文獻回顧與技術選型
   </h1>
   <div class="chapter-lead">
-    本章說明本研究的核心技術與文獻依據:遷移學習、MobileNetV3-Large、SE 注意力機制、MediaPipe 人臉偵測,以及 PyTorch + FastAPI + Vue 3 的部署選擇。
+    本章說明本研究選用的核心技術與背後理由：遷移學習、MobileNetV3-Large、SE 注意力機制、MediaPipe 人臉偵測，以及 PyTorch + FastAPI + Vue 3 的部署選擇。不懂程式沒關係，每個技術名詞我們都會用類比幫你理解。
   </div>
 
-  <h2><span class="num">3.1</span>遷移學習(Transfer Learning)</h2>
+  <h2><span class="num">3.1</span>遷移學習（Transfer Learning）</h2>
   <p>
-    遷移學習的核心精神是「將在大型資料集(如 ImageNet 的 1,400 萬張圖)上預訓的網路,作為新任務的起點,而非從零開始訓練」。Yosinski et al. (2014) 在《How transferable are features in deep neural networks?》中實證:卷積網路前幾層學到的「邊緣、紋理、形狀」等通用特徵,可廣泛遷移至各種視覺任務。
+    遷移學習（用大型已訓好的 AI 作為起點，不從零開始）的核心精神是：「將在大型資料集（如 ImageNet 的 1,400 萬張圖）上預訓的網路，作為新任務的起點，而非從零開始訓練」。就像你已經學會騎腳踏車，再學騎機車就比從零開始快很多——同樣地，已經「看過」1,400 萬張照片的 AI，只需要稍微調整，就能學會判斷表情好不好。Yosinski et al. (2014) 在學術研究中實證：AI 前幾層學到的「邊緣、紋理、形狀」等通用特徵，可以廣泛套用到各種視覺任務上。
   </p>
-  <p>對本研究而言,遷移學習是必要的選擇:</p>
+  <p>對本研究而言，遷移學習是必要的選擇：</p>
   <ul>
-    <li>資料集僅 1,060 張,從零訓練 MobileNetV3 必然嚴重過擬合。</li>
-    <li>ImageNet 預訓權重已學會「人臉、眼睛、嘴巴」等低階特徵,我們只需教模型「在這些特徵上,什麼組合 = 崩壞表情」。</li>
+    <li>資料集僅 1,060 張，從零開始訓練必然嚴重「死背」訓練資料、對新照片一無是處。</li>
+    <li>ImageNet 預訓的 AI 已學會「人臉、眼睛、嘴巴」等基礎特徵，我們只需教它「在這些特徵上，什麼組合 = 崩壞表情」。</li>
   </ul>
 
   <h2><span class="num">3.2</span>MobileNetV3-Large 與 SE Attention</h2>
-  <p>MobileNet 系列由 Google 為行動裝置設計,核心目標是「在精度與運算量間取得平衡」。其演進路線:</p>
+  <p>MobileNetV3-Large 是 Google 專門為手機設計的輕量神經網路架構，目標是在速度快、消耗資源少的前提下盡量保持準確。MobileNet 系列的演進路線：</p>
   <ul>
-    <li><b>MobileNetV1 (2017):</b>提出 Depthwise Separable Convolution,大幅降低運算量。</li>
-    <li><b>MobileNetV2 (2018):</b>引入 Inverted Residual + Linear Bottleneck,提升特徵表達能力。</li>
-    <li><b>MobileNetV3 (2019, Howard et al.):</b>結合 NAS 自動搜尋最佳架構,並導入 <b>SE Attention 模組</b>與 Hard-Swish 激活函數。</li>
+    <li><b>MobileNetV1 (2017)：</b>提出一種更有效率的計算方式，大幅降低運算量。</li>
+    <li><b>MobileNetV2 (2018)：</b>改進內部結構，提升特徵表達能力。</li>
+    <li><b>MobileNetV3 (2019, Howard et al.)：</b>結合自動搜尋最佳架構的技術，並導入 <b>SE Attention 模組</b>（讓 AI 知道「重點看哪裡」）與更好的激活函數。</li>
   </ul>
 
-  <p>SE Attention(Hu et al., 2018)是關鍵的注意力機制 — 它讓網路學會「<b>哪些通道(channel)重要、哪些不重要</b>」,並用 sigmoid 動態調整通道權重:</p>
+  <p>SE Attention（Hu et al., 2018）是關鍵的注意力機制。SE Attention 的作用就像一個聰明的閱卷老師：它不是每個字都仔細看，而是先快速掃一遍，判斷「這份考卷的重點在哪裡」，再集中注意力看關鍵的地方（眼睛、嘴角）。技術上，它讓網路學會「<b>哪些通道（channel，可以理解為照片的不同特徵層）重要、哪些不重要</b>」，並動態調整各通道的權重。用公式表達的話（不懂數學沒關係，重點是概念）：</p>
 
   <pre data-lang="formula">SE Attention 的三階段:
   <span class="com"># 1. Squeeze: 把每個通道壓成單一數值(global average pooling)</span>
@@ -555,17 +555,17 @@ table .best td { color: var(--ink); }
   output = x ⊙ s                       # 通道乘法</pre>
 
   <p>
-    對人臉表情這種<b>細粒度任務</b>,SE Attention 特別有效 — 它幫助網路自動聚焦於「眼睛、嘴角」等真正承載表情資訊的通道,而忽略背景、頭髮等非關鍵特徵。我們在第 6 章透過 V2 vs V3-Large 對照實驗驗證此論點。
+    對人臉表情這種需要「精細辨別」的任務，SE Attention 特別有效——它幫助 AI 自動聚焦於「眼睛、嘴角」等真正承載表情資訊的區域，而忽略背景、頭髮等非關鍵部分。我們在第 6 章透過實驗對比驗證了這個效果（比舊版準確率高 4 個百分點）。
   </p>
 
   <h2><span class="num">3.3</span>MediaPipe Face Detection</h2>
   <p>
-    人臉偵測是本系統的前置步驟。我們選用 Google 開源的 MediaPipe(Bazarevsky et al., 2019, <i>BlazeFace</i>),原因:
+    人臉偵測是本系統的前置步驟——在 AI 判斷表情之前，要先「找到臉在哪裡」。MediaPipe 是 Google 開源的人臉偵測工具，可以快速在一張照片中找到人臉的位置，並標出眼睛、嘴巴等關鍵點（Bazarevsky et al., 2019, <i>BlazeFace</i>）。我們選用它的原因：
   </p>
   <ul>
-    <li><b>輕量高速:</b>BlazeFace 在 CPU 上單張推論時間極短,適合即時批次處理。</li>
-    <li><b>提供兩種模型:</b>short-range(< 2 公尺,擅長肖像)與 full-range(< 5 公尺,擅長合照中遠距人臉),我們將兩者整合為 fallback 鏈。</li>
-    <li><b>輸出 bounding box + 關鍵點:</b>除了 bbox,還回傳眼睛、嘴巴等關鍵點(本研究僅使用 bbox)。</li>
+    <li><b>輕量高速：</b>即使在普通筆電 CPU 上，每張照片的偵測速度也極快，適合批次處理大量相簿。</li>
+    <li><b>提供兩種模型：</b>short-range（擅長近距離大臉、自拍）與 full-range（擅長合照中較遠的人臉），我們將兩者串聯為「找不到就換一個試試」的備援鏈。</li>
+    <li><b>輸出人臉框 + 關鍵點：</b>除了告訴我們臉在哪個範圍，還標出眼睛、嘴巴位置（本研究只用臉的範圍框）。</li>
   </ul>
 
   <h2><span class="num">3.4</span>框架選擇:PyTorch + FastAPI + Vue 3</h2>
@@ -596,7 +596,7 @@ table .best td { color: var(--ink); }
   </div>
 
   <h2><span class="num">4.1</span>整體流程</h2>
-  <p>系統可分為「離線階段(模型訓練)」與「線上階段(Web 服務)」兩大流程:</p>
+  <p>簡單說：系統分兩個階段，第一階段是「訓練 AI」（只需做一次），第二階段是「使用 AI 幫你整理相簿」（每次掃描都走這條路）。系統可分為「離線階段（模型訓練）」與「線上階段（Web 服務）」兩大流程：</p>
 
   <pre data-lang="pipeline">─────── 離線:模型訓練 pipeline ───────
 原始照片 / 影片
@@ -750,8 +750,9 @@ checkpoint = {
     <li><b>類型 C — 極端 edge cases:</b>手蓋住臉、極遠距人物等,任何單一模型都難以處理。</li>
   </ul>
 
-  <p>對策上,我們設計了三層 fallback 鏈:</p>
+  <p>對策上，我們設計了三層 fallback 鏈（意思是：先試第一種方法，找不到臉就換第二種，再找不到換第三種）：</p>
 
+  <p>以下是三層偵測的程式邏輯（可以跳過看概念）：</p>
   <pre data-lang="python"><span class="kw">def</span> <span class="fn">_detect_largest_face</span>(bgr, min_face_px, margin):
     <span class="com">"""三層 fallback,逐層降階嘗試。"""</span>
     primary, fallback = _get_detectors()  <span class="com"># model 0, model 1</span>
@@ -796,9 +797,9 @@ checkpoint = {
     </tbody>
   </table>
 
-  <h2><span class="num">5.4</span>資料增強(Data Augmentation)</h2>
+  <h2><span class="num">5.4</span>資料增強（Data Augmentation）</h2>
   <p>
-    為了在小資料集條件下提升泛化能力,我們設計了多重資料增強策略,僅應用於訓練集(驗證/測試集保持原始狀態):
+    資料增強就像讓同一道題目出現各種變形版本——這樣訓練出來的 AI 不會只會解「原版」，碰到旋轉、變暗、有遮擋的照片也不慌。為了在小資料集條件下提升泛化能力，我們設計了多重資料增強策略，僅應用於訓練集（驗證／測試集保持原始狀態，確保評估公平）：
   </p>
 
   <pre data-lang="python">train_tf = transforms.Compose([
@@ -830,9 +831,9 @@ checkpoint = {
     <li><b>RandomErasing:</b>遮擋是真實場景的常態(手指、口罩、太陽眼鏡),隨機塗黑一塊可顯著提升 robust。</li>
   </ul>
 
-  <h2><span class="num">5.5</span>嚴謹的三段切分(Train / Val / Test)</h2>
+  <h2><span class="num">5.5</span>嚴謹的三段切分（Train / Val / Test）</h2>
   <p>
-    傳統做法是將資料切為 train / val 兩段,但這在「<b>調超參數時反覆觀察 val 表現</b>」的情境下,可能導致 val acc 虛胖(實際上模型在不知不覺中過擬合到 val set)。為避免此陷阱,我們採用嚴格的三段切分:
+    這就像考試系統：Train 是課堂練習、Val 是模擬考、Test 是正式考試。我們只用正式考試的成績（75.1%）對外宣稱模型有多好，避免自欺欺人。傳統做法是將資料切為 train / val 兩段，但這在「<b>調超參數時反覆觀察 val 表現</b>」的情境下，可能導致 val acc 虛胖（實際上模型在不知不覺中死背了 val set 的答案）。為避免此陷阱，我們採用嚴格的三段切分：
   </p>
 
   <table>
@@ -873,8 +874,8 @@ checkpoint = {
   <h2><span class="num">6.1</span>Two-Stage Fine-Tuning 策略</h2>
   <p>本研究採取「兩階段微調」策略,逐步釋放模型能力:</p>
 
-  <h3>Stage 1 — 凍結 features,只訓練 classifier head</h3>
-  <p>將 ImageNet 預訓的 backbone 全部凍結,僅訓練自定義的 2 類分類頭。此階段目的是讓 head 適配新任務,而不破壞預訓特徵:</p>
+  <h3>Stage 1 — 凍結 features，只訓練 classifier head</h3>
+  <p>「凍結」的意思是：暫時不讓 AI 修改已有的知識，只讓它學新的分類頭——就像你在學新技能時，先保持原有的基礎不動，再在上面疊加新東西。將 ImageNet 預訓的 backbone 全部凍結，僅訓練自定義的 2 類分類頭（告訴 AI 什麼是 Good、什麼是 Bad）。此階段目的是讓 head 適配新任務，而不破壞預訓特徵：</p>
 
   <pre data-lang="python"><span class="kw">def</span> <span class="fn">build_model</span>():
     model = <span class="fn">mobilenet_v3_large</span>(weights=MobileNet_V3_Large_Weights.IMAGENET1K_V2)
@@ -886,7 +887,7 @@ optimizer = optim.<span class="fn">Adam</span>(trainable, lr=<span class="num">1
 epochs = <span class="num">15</span></pre>
 
   <h3>Stage 2 — 解凍最後 3 個 inverted residual blocks</h3>
-  <p>Stage-1 完成後,載入最佳 checkpoint,解凍最後 3 個 blocks(features[14:]),並用<b>更小的學習率</b>(1e-5,Stage-1 的 1/100)繼續訓練。這允許底層特徵也微幅調整,但避免大幅更新破壞預訓知識。</p>
+  <p>Stage-2 才小心翼翼地「解凍」最後幾層，用更小的調整幅度微調——就像微調，不是大改。Stage-1 完成後，載入最佳 checkpoint，解凍最後 3 個 blocks（features[14:]），並用<b>更小的學習率</b>（1e-5，這個數字代表每次更新的幅度非常非常小，是 Stage-1 的 1/100，避免把前面學到的東西洗掉）繼續訓練。這允許底層特徵也微幅調整，但避免大幅更新破壞預訓知識。</p>
 
   <h2><span class="num">6.2</span>正則化策略 — 對抗小資料集過擬合</h2>
   <div class="three-col">
@@ -907,7 +908,7 @@ epochs = <span class="num">15</span></pre>
   <h2><span class="num">6.3</span>推論優化(TTA + 閾值調校)</h2>
 
   <h3>TTA — 水平翻轉版本平均</h3>
-  <p>將每張測試照片同時餵入「原圖」與「水平翻轉版本」,將兩個預測機率平均,得到更穩定的最終預測:</p>
+  <p>TTA 的概念很直覺：把同一張照片翻轉一次、讓模型看兩次，把兩次的預測結果平均，就像出一道題目讓兩個人都做、再取平均分數，比只問一個人更穩定。將每張測試照片同時餵入「原圖」與「水平翻轉版本」，將兩個預測機率平均，得到更穩定的最終預測：</p>
 
   <pre data-lang="python"><span class="kw">def</span> <span class="fn">predict_image_quality</span>(image_path):
     face = <span class="fn">_detect_and_crop_face</span>(image_path)
@@ -917,7 +918,7 @@ epochs = <span class="num">15</span></pre>
     <span class="kw">return</span> probs.<span class="fn">mean</span>(axis=<span class="num">0</span>)  <span class="com"># 兩版本機率平均</span></pre>
 
   <h3>決策閾值自動掃描</h3>
-  <p>傳統做法用 0.5 作為「Bad」與「Good」的分界,但這個切點在小資料集上未必最佳。我們在 val set 上掃描 0.30~0.70,找出真正讓 val accuracy 最高的閾值,並寫入 checkpoint。本研究最終掃出最佳閾值為 <b>0.47</b>。</p>
+  <p>傳統做法是以 0.5 作為分界（機率超過 50% 就算 Bad），但這個切點未必最準。我們在驗證集上試了 0.30 到 0.70 每個值，找出讓正確率最高的那個——最後找到 <b>0.47</b>，比 0.5 稍低，代表模型對 Bad 判斷偏保守，調低一點剛好。這個最佳閾值會自動寫入 checkpoint，推論時直接使用。</p>
 
   <div class="page-footer">
     <span class="brand">Darkroom<span class="dot">.</span></span>
@@ -1005,7 +1006,7 @@ val_acc @ 0.47 = 0.763
   </div>
 
   <h2><span class="num">7.2</span>Confusion Matrix 分析</h2>
-  <p>對 193 張測試樣本,模型輸出與真實標籤的對照表:</p>
+  <p>Confusion Matrix（混淆矩陣）就是一張對照表，記錄 AI 說對了幾張、說錯了幾張：對 193 張測試樣本，模型輸出與真實標籤的對照如下：</p>
 
   <table>
     <thead><tr><th></th><th>預測 Bad</th><th>預測 Good</th><th>類別總數</th></tr></thead>
@@ -1020,6 +1021,7 @@ val_acc @ 0.47 = 0.763
     <li><b>FP = 31</b>:誤判 31 張 Good 為 Bad(使用者透過 UI 勾選機制可撤回);<b>TN = 63</b>:正確留下 63 張 Good。</li>
   </ul>
 
+  <p>Precision（精確率）= 模型說「這張是 Bad」的時候，真的是 Bad 的比例。Recall（召回率）= 所有真正的 Bad 照片裡，模型有找出幾張。兩個數字一起看，才能完整評估模型的實用性。</p>
   <table>
     <thead><tr><th>類別</th><th>Precision</th><th>Recall</th><th>F1-score</th><th>Support</th></tr></thead>
     <tbody>
@@ -1075,15 +1077,15 @@ val_acc @ 0.47 = 0.763
     系統實作與 UI 設計
   </h1>
   <div class="chapter-lead">
-    本系統採「<b>前後端分離</b>」架構:<b>FastAPI</b> 後端封裝模型推論與檔案操作,以 REST API 形式對外;<b>Vue 3 + Vite</b> 前端負責互動與視覺。本章說明 API 設計、Vue 組件結構、軟刪除機制與 Darkroom 視覺識別。
+    FastAPI 是一個 Python 後端框架，負責執行 AI 掃描、管理照片；Vue 3 是一個 JavaScript 前端框架，負責你在瀏覽器看到的畫面。兩者分開運行，用 REST API（一種標準的網路溝通協定）互相傳遞資料。本章說明 API 設計、Vue 組件結構、軟刪除機制與 Darkroom 視覺識別。
   </div>
 
   <h2><span class="num">8.1</span>架構選擇 — 為什麼前後端分離</h2>
   <p>
-    開發初期我們以 <b>Streamlit</b> 快速搭建原型,優點是「全 Python、瞬間出 UI」。但當資料集擴大到 1,000+ 照片後,Streamlit 的「<b>任何 widget 互動都 rerun 整個 script</b>」架構造成明顯卡頓 — 切 tab、勾 checkbox 都會重新渲染所有元件。
+    開發初期我們以 <b>Streamlit</b>（一種快速搭建 Python 介面的工具）快速建出原型，優點是「全 Python、瞬間出 UI」。但當資料集擴大到 1,000+ 照片後，Streamlit 的「<b>任何按鈕互動都重新執行整個程式</b>」設計造成明顯卡頓——切分頁、勾選照片都會重新渲染所有元件，體驗很差。
   </p>
   <p>
-    我們因此將前端重寫為 <b>Vue 3 + Vite</b>,後端維持 Python 但封裝為 <b>FastAPI</b> 服務。差異對比:
+    我們因此將前端重寫為 <b>Vue 3 + Vite</b>，後端維持 Python 但封裝為 <b>FastAPI</b> 服務。差異對比：
   </p>
 
   <table>
@@ -1093,7 +1095,7 @@ val_acc @ 0.47 = 0.763
       <tr><td>切 Tab</td><td>整頁重建</td><td>純 CSS 切換,瞬間</td></tr>
       <tr><td>勾 Checkbox</td><td>需 fragment 才能不卡</td><td>單張卡片更新</td></tr>
       <tr><td>圖片載入</td><td>Base64 內嵌 HTML</td><td>HTTP 圖片 + 瀏覽器快取</td></tr>
-      <tr><td>佈署</td><td>單一 process</td><td>後端 API + 前端 SPA(可同源)</td></tr>
+      <tr><td>佈署</td><td>單一 process</td><td>後端 API + 前端 SPA（單頁應用，換頁不需重新載入整個網站，可同源）</td></tr>
     </tbody>
   </table>
 
@@ -1115,7 +1117,7 @@ val_acc @ 0.47 = 0.763
   </table>
 
   <h3>非同步掃描設計</h3>
-  <p>掃描可能耗時數十秒到數分鐘。POST <code>/api/scan</code> 立即回傳 job_id 並在背景 thread 執行;前端每 500ms 輪詢進度,UI 不阻塞:</p>
+  <p>掃描可能需要好幾分鐘，如果讓瀏覽器乾等，畫面會整個凍住。所以我們的設計是：按下掃描後馬上回傳一個「工作 ID」，讓前端每 0.5 秒去查一次進度——使用者就能看到即時更新的進度條，而不是對著空白畫面發呆。技術上，POST <code>/api/scan</code> 立即回傳 job_id 並在背景 thread 執行；前端每 500ms 輪詢進度，UI 不阻塞：</p>
 
   <pre data-lang="python"><span class="com"># backend/main.py — 啟動掃描 (節錄)</span>
 <span class="kw">@app.post</span>(<span class="str">"/api/scan"</span>)
@@ -1137,9 +1139,9 @@ val_acc @ 0.47 = 0.763
 
 <!-- ════════════════ 第八章續 ════════════════ -->
 <div class="page">
-  <h2><span class="num">8.3</span>前端設計 — Vue 3 SPA</h2>
+  <h2><span class="num">8.3</span>前端設計 — Vue 3 SPA（單頁應用）</h2>
   <p>
-    前端使用 <b>Vue 3 Composition API</b> 與 <code>reactive()</code> 全局狀態,以 Single File Component 切分:
+    前端使用 <b>Vue 3 Composition API</b>（一種讓畫面跟資料自動同步的寫法）與 <code>reactive()</code> 全局狀態，以 Single File Component（每個功能區塊各自一個檔案）切分：
   </p>
 
   <table>
@@ -1366,7 +1368,8 @@ val_acc @ 0.47 = 0.763
 
   <div class="callout sage">
     <span class="label">原始碼</span>
-    <b>本專案開源</b> · MIT License · 歡迎社群貢獻與延伸應用
+    <b>本專案開源</b> · MIT License · 歡迎社群貢獻與延伸應用<br>
+    https://github.com/Hunter20041004/smart-album-cleaner
   </div>
 
   <div class="page-footer">
