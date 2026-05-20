@@ -21,61 +21,102 @@
 
 ---
 
-## 🚀 快速開始
+## 🚀 安裝與啟動
 
-### 方式 A:下載即用(推薦,5 分鐘)
+### 事前準備
+
+| 工具 | 版本 | 下載 |
+|------|------|------|
+| Python | 3.11+ | [python.org](https://www.python.org/downloads/) |
+| Node.js | 18+ | [nodejs.org](https://nodejs.org/) |
+| Git | 任意 | [git-scm.com](https://git-scm.com/) |
+
+---
+
+### Mac / Linux
 
 ```bash
-# 1. clone 專案
-git clone https://github.com/cengweiting/smart-album-cleaner.git
+# 1. 下載專案
+git clone https://github.com/Hunter20041004/smart-album-cleaner.git
 cd smart-album-cleaner
 
-# 2. 建虛擬環境 + 安裝 Python 依賴
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-
-# 3. 下載預訓好的模型權重(免訓練!)
+# 2. 下載預訓模型權重(免自己訓練!)
 mkdir -p models
-curl -L https://github.com/cengweiting/smart-album-cleaner/releases/latest/download/mobilenet_face.pth \
+curl -L https://github.com/Hunter20041004/smart-album-cleaner/releases/latest/download/mobilenet_face.pth \
     -o models/mobilenet_face.pth
 
-# 4. 建置前端
+# 3. 建置前端
 cd frontend && npm install && npm run build && cd ..
 
-# 5. 啟動後端 → 瀏覽器開啟 http://localhost:8000
+# 4. 啟動(首次會自動建虛擬環境 + 安裝套件,約 1-2 分鐘)
 ./run.sh
 ```
 
-> 📦 **預訓權重檔**:`mobilenet_face.pth`(12 MB,val_acc 75.1%)
-> 🔗 下載:[GitHub Releases](https://github.com/cengweiting/smart-album-cleaner/releases)
+瀏覽器開啟 → **http://localhost:8000**
 
-### 方式 B:開發模式(前後端分離)
+---
 
-```bash
-# 終端機 1 — 後端
-source .venv/bin/activate
-uvicorn backend.main:app --reload --port 8000
+### Windows
 
-# 終端機 2 — 前端(Hot reload)
-cd frontend && npm run dev
-# 開啟 http://localhost:5173
+```bat
+:: 1. 下載專案
+git clone https://github.com/Hunter20041004/smart-album-cleaner.git
+cd smart-album-cleaner
+
+:: 2. 下載預訓模型權重
+mkdir models
+curl -L https://github.com/Hunter20041004/smart-album-cleaner/releases/latest/download/mobilenet_face.pth -o models/mobilenet_face.pth
+
+:: 3. 建置前端
+cd frontend
+npm install
+npm run build
+cd ..
+
+:: 4. 建立虛擬環境 + 安裝套件
+python -m venv .venv
+.venv\Scripts\pip install -r requirements.txt
+
+:: 5. 啟動
+.venv\Scripts\uvicorn backend.main:app --host 0.0.0.0 --port 8000
 ```
 
-### 方式 C:自訓你自己的模型
+瀏覽器開啟 → **http://localhost:8000**
 
-```bash
-# 1. 把照片分好類丟進這兩個資料夾
-datasets/raw/Good/    # 表情自然的照片(150 張以上)
-datasets/raw/Bad/     # 表情崩壞的照片(150 張以上)
+---
 
-# 2. 裁切 → 訓練 → 微調
-python -m src.prepare_dataset
-python -m src.train_mobilenet --arch mobilenet_v3_large
-python -m src.train_mobilenet --arch mobilenet_v3_large --finetune
+## 📖 使用教學
 
-# 3. 啟動
-./run.sh
-```
+### Step 1 — 選擇相片資料夾
+
+啟動後在首頁點「選擇資料夾」,輸入你的相片資料夾路徑(例如 `/Users/yourname/Photos/2024`),支援多層子資料夾。
+
+### Step 2 — 開始 AI 掃描
+
+點「開始掃描」,畫面會顯示即時進度條與預估剩餘時間。掃描速度約每張 80-130ms(M2 MacBook Air)。
+
+### Step 3 — 查看分析結果
+
+掃描完成後進入結果頁,分為三個分頁：
+
+| 分頁 | 說明 |
+|------|------|
+| ⚠️ **建議刪除** | AI 判定表情崩壞(閉眼、嘴歪等),附「原圖」與「AI 鎖定區」對照 |
+| ✅ **完美表情** | AI 判定表情自然良好 |
+| 👀 **未偵測到人臉** | 無人臉或人臉過小無法判定(風景、物品等) |
+
+### Step 4 — 勾選並刪除廢片
+
+在「建議刪除」頁：
+- 點「全選」快速選取所有廢片,或手動勾選想刪的張數
+- 點「移到 Trash」— 照片**不會永久消失**,而是移到專案的 `Trash/` 資料夾
+
+### Step 5 — 還原誤刪的照片(選用)
+
+如果不小心刪錯了：
+1. 點左側選單「♻ Trash」
+2. 勾選想還原的照片
+3. 點「還原勾選的 N 張」— 照片會回到原來的資料夾
 
 ---
 
@@ -114,7 +155,7 @@ python -m src.train_mobilenet --arch mobilenet_v3_large --finetune
 **效能**(M2 MacBook Air):
 
 | 任務 | 耗時 |
-|---|---|
+|------|------|
 | MediaPipe 偵測 + 裁切(1 張) | ~50 ms |
 | MobileNetV3 推論(含 TTA) | ~80 ms |
 | **完整掃描 1000 張** | **~2 分鐘** |
@@ -131,7 +172,7 @@ smart-album-cleaner/
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── pyproject.toml
-├── run.sh                        ← 一鍵啟動
+├── run.sh                        ← 一鍵啟動(Mac/Linux)
 ├── backend/
 │   └── main.py                   ← FastAPI app (REST API + 靜態服務)
 ├── frontend/
@@ -161,18 +202,22 @@ smart-album-cleaner/
 
 ---
 
-## ⚙️ 進階指令
+## ⚙️ 進階:自訓你自己的模型
+
+如果想用自己的照片重新訓練個性化模型：
 
 ```bash
-# 用 V2 backbone 對比實驗
-python -m src.train_mobilenet --arch mobilenet_v2
+# 1. 把照片分好類丟進這兩個資料夾
+datasets/raw/Good/    # 表情自然的照片(建議 150 張以上)
+datasets/raw/Bad/     # 表情崩壞的照片(建議 150 張以上)
 
-# 評估現有模型(不重訓)
+# 2. 裁切 → 訓練 → 微調
+python -m src.prepare_dataset
+python -m src.train_mobilenet --arch mobilenet_v3_large
+python -m src.train_mobilenet --arch mobilenet_v3_large --finetune
+
+# 評估模型成效
 python -m src.evaluate --model models/mobilenet_face.pth
-
-# 跑測試
-pip install -r requirements-dev.txt
-pytest tests/ -v
 ```
 
 ---
