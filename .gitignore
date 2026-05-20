@@ -68,5 +68,9 @@ frontend/node_modules/
 # ─── Streamlit 使用者資料(含本機路徑) ────────────────────────────────
 .streamlit/recent_folders.json
 
+# ─── 海報與報告(僅本地保存，不公開) ─────────────────────────────────
+poster.html
+report.html
+
 # ─── Claude Code ─────────────────────────────────────────────────────
 .claude/settings.local.json
