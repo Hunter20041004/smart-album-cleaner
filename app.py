@@ -1429,7 +1429,7 @@ with st.sidebar:
         st.markdown(
             "**Download:**\n"
             "```bash\n"
-            "curl -L https://github.com/<your-username>/smart-album-cleaner/"
+            "curl -L https://github.com/Hunter20041004/smart-album-cleaner/"
             "releases/latest/download/mobilenet_face.pth \\\n"
             "    -o models/mobilenet_face.pth\n"
             "```"

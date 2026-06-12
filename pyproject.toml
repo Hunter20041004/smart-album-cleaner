@@ -54,9 +54,9 @@ album-evaluate = "src.evaluate:main"
 album-extract-frames = "src.extract_frames:main"
 
 [project.urls]
-Homepage = "https://github.com/your-username/smart-album-cleaner"
-Repository = "https://github.com/your-username/smart-album-cleaner"
-Issues = "https://github.com/your-username/smart-album-cleaner/issues"
+Homepage = "https://github.com/Hunter20041004/smart-album-cleaner"
+Repository = "https://github.com/Hunter20041004/smart-album-cleaner"
+Issues = "https://github.com/Hunter20041004/smart-album-cleaner/issues"
 
 # ── 程式碼風格 ──────────────────────────────────────────────────────
 [tool.setuptools.packages.find]
