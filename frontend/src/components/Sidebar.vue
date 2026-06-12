@@ -7,10 +7,53 @@ const startScan = inject('startScan')
 const showAlert = inject('showAlert')
 
 const isScanning = computed(() => state.viewMode === 'scanning')
+const sourceLabel = computed(() => {
+  if (state.sourceMode === 'files') {
+    return state.selectedPaths.length
+      ? `已選擇 ${state.selectedPaths.length} 張圖片`
+      : '尚未選擇圖片'
+  }
+  return state.folder || '尚未選擇資料夾'
+})
+
+async function chooseFolder() {
+  if (isScanning.value) return
+  try {
+    const data = await api.selectFolder()
+    if (data.cancelled) return
+    state.folder = data.folder
+    state.selectedPaths = []
+    state.sourceMode = 'folder'
+    state.scanFolder = null
+  } catch (e) {
+    showAlert('error', e.message)
+  }
+}
+
+async function chooseFiles() {
+  if (isScanning.value) return
+  try {
+    const data = await api.selectFiles()
+    if (data.cancelled) return
+    const mergedPaths = new Set([...state.selectedPaths, ...data.paths])
+    state.selectedPaths = Array.from(mergedPaths)
+    state.folder = ''
+    state.sourceMode = 'files'
+    state.scanFolder = null
+  } catch (e) {
+    showAlert('error', e.message)
+  }
+}
+
+function clearSelectedFiles() {
+  state.selectedPaths = []
+  state.sourceMode = 'files'
+  state.scanFolder = null
+}
 
 async function viewTrash() {
-  if (!state.scanFolder && !state.folder) {
-    showAlert('warning', '尚未指定資料夾')
+  if (!state.scanFolder && !state.folder && state.trashFolders.length === 0) {
+    showAlert('warning', '尚未有可查看的 Trash 位置')
     return
   }
   state.viewMode = 'trash'
@@ -29,13 +72,36 @@ function resetScan() {
       <div class="brand-meta">AI 表情相簿管家</div>
     </div>
 
-    <div class="nav-label">目標資料夾</div>
-    <input
-      type="text"
-      v-model="state.folder"
-      placeholder="例:./datasets/raw"
-      :disabled="isScanning"
-    />
+    <div class="nav-label">掃描來源</div>
+    <div class="folder-picker">
+      <div class="selected-folder" :title="sourceLabel">
+        {{ sourceLabel }}
+      </div>
+      <div class="source-actions">
+        <button
+          class="btn btn-ghost"
+          :disabled="isScanning"
+          @click="chooseFolder"
+        >
+          選擇資料夾
+        </button>
+        <button
+          class="btn btn-ghost"
+          :disabled="isScanning"
+          @click="chooseFiles"
+        >
+          選擇圖片
+        </button>
+      </div>
+      <button
+        v-if="state.sourceMode === 'files'"
+        class="btn btn-ghost btn-block"
+        :disabled="isScanning || state.selectedPaths.length === 0"
+        @click="clearSelectedFiles"
+      >
+        清空所選照片
+      </button>
+    </div>
 
     <div class="nav-label">啟動</div>
     <button
@@ -55,7 +121,7 @@ function resetScan() {
     <button
       class="btn btn-ghost btn-block"
       style="margin-top: 10px"
-      :disabled="!state.scanFolder && !state.folder"
+      :disabled="!state.scanFolder && !state.folder && state.trashFolders.length === 0"
       @click="viewTrash"
     >
       ♻ 查看 Trash

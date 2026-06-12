@@ -4,6 +4,7 @@ import { api } from '../api.js'
 
 const state = inject('state')
 const showAlert = inject('showAlert')
+const rememberTrashFolder = inject('rememberTrashFolder')
 
 const activeTab = ref('bad')  // bad | good | noface
 const selectedPaths = reactive(new Set())   // checkbox 勾選的 Bad 照片路徑
@@ -64,6 +65,7 @@ async function doDelete() {
       it => !movedSet.has(it.path)
     )
     selectedPaths.clear()
+    rememberTrashFolder(state.scanFolder)
     showAlert('success', `✅ 已將 ${result.moved.length} 張移到 Trash`)
     // 修正頁碼避免空白頁
     if (pageBad.value > badPages.value) pageBad.value = badPages.value

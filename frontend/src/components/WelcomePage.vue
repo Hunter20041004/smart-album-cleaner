@@ -1,9 +1,9 @@
 <script setup>
 const steps = [
-  { num: 1, title: '輸入路徑',  desc: '在左側填入相簿資料夾。' },
-  { num: 2, title: '啟動掃描',  desc: '點擊「啟動 AI 掃描」,神經網路逐張分析。' },
-  { num: 3, title: '挑出廢片',  desc: '在 Bad 分頁勾選你同意刪除的照片。' },
-  { num: 4, title: '安全刪除',  desc: '軟刪除到 Trash,可隨時還原,不會遺失。' },
+  { num: 1, title: '選擇來源',  desc: '在左側選資料夾,或分批選幾張圖片。' },
+  { num: 2, title: '啟動掃描',  desc: '點擊「啟動 AI 掃描」,AI 逐張分析。' },
+  { num: 3, title: '勾選廢片',  desc: '在 Bad 分頁確認並勾選要清理的照片。' },
+  { num: 4, title: '刪除或還原',  desc: '先移到 Trash,可還原或送進電腦垃圾桶。' },
 ]
 
 const classes = [

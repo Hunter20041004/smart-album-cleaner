@@ -16,12 +16,14 @@ async function _fetch(url, opts = {}) {
 export const api = {
   // 健康檢查 + 模型狀態
   health: () => _fetch('/api/health'),
+  selectFolder: () => _fetch('/api/select-folder', { method: 'POST' }),
+  selectFiles: () => _fetch('/api/select-files', { method: 'POST' }),
 
   // 掃描
-  startScan: (folder) =>
+  startScan: ({ folder = null, paths = null }) =>
     _fetch('/api/scan', {
       method: 'POST',
-      body: JSON.stringify({ folder }),
+      body: JSON.stringify({ folder, paths }),
     }),
   getScan: (jobId) => _fetch(`/api/scan/${jobId}`),
   cancelScan: (jobId) => _fetch(`/api/scan/${jobId}`, { method: 'DELETE' }),
@@ -41,6 +43,11 @@ export const api = {
     }),
   restoreFromTrash: (folder, trashPaths = null) =>
     _fetch('/api/trash/restore', {
+      method: 'POST',
+      body: JSON.stringify({ folder, trash_paths: trashPaths }),
+    }),
+  moveTrashToSystemTrash: (folder, trashPaths = null) =>
+    _fetch('/api/trash/system-delete', {
       method: 'POST',
       body: JSON.stringify({ folder, trash_paths: trashPaths }),
     }),

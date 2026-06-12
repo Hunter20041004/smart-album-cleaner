@@ -10,7 +10,10 @@ import { api } from './api.js'
 // 全局狀態(用 reactive 管理)
 const state = reactive({
   modelLoaded: false,
-  folder: './datasets/raw',
+  folder: '',
+  selectedPaths: [],
+  sourceMode: 'folder',  // folder | files
+  trashFolders: [],
   viewMode: 'welcome',   // welcome | scanning | results | trash
   jobId: null,
   scanProgress: null,    // { current, total, current_name, eta_seconds, status }
@@ -20,6 +23,14 @@ const state = reactive({
 })
 
 provide('state', state)
+
+function rememberTrashFolder(folder) {
+  if (!folder) return
+  const folders = [folder, ...state.trashFolders.filter(f => f !== folder)]
+  state.trashFolders = folders.slice(0, 20)
+  localStorage.setItem('darkroom.trashFolders', JSON.stringify(state.trashFolders))
+}
+provide('rememberTrashFolder', rememberTrashFolder)
 
 // 顯示提示訊息(3 秒後自動消失)
 function showAlert(type, message) {
@@ -33,6 +44,12 @@ provide('showAlert', showAlert)
 // 健康檢查 — 確認後端在跑、模型有載入
 onMounted(async () => {
   try {
+    state.trashFolders = JSON.parse(localStorage.getItem('darkroom.trashFolders') || '[]')
+  } catch {
+    state.trashFolders = []
+  }
+
+  try {
     const h = await api.health()
     state.modelLoaded = h.model_loaded
     if (!h.model_loaded) {
@@ -45,12 +62,15 @@ onMounted(async () => {
 
 // 啟動掃描
 async function startScan() {
-  if (!state.folder) {
-    showAlert('warning', '請先輸入資料夾路徑')
+  if (!state.folder && state.selectedPaths.length === 0) {
+    showAlert('warning', '請先選擇資料夾或圖片')
     return
   }
   try {
-    const { job_id } = await api.startScan(state.folder)
+    const payload = state.sourceMode === 'files'
+      ? { paths: state.selectedPaths }
+      : { folder: state.folder }
+    const { job_id } = await api.startScan(payload)
     state.jobId = job_id
     state.viewMode = 'scanning'
     state.scanProgress = {
@@ -72,6 +92,7 @@ async function pollScanProgress() {
     if (data.status === 'done') {
       state.scanResults = data.results
       state.scanFolder = data.folder
+      rememberTrashFolder(data.folder)
       state.viewMode = 'results'
       state.jobId = null
       showAlert('success', `掃描完成 — Good ${data.results.Good.length} · Bad ${data.results.Bad.length} · NoFace ${data.results.NoFace.length}`)

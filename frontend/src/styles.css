@@ -106,6 +106,37 @@ input[type='checkbox'] {
   cursor: pointer;
 }
 
+.folder-picker {
+  display: grid;
+  gap: 8px;
+}
+
+.source-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+}
+
+.source-actions .btn {
+  min-width: 0;
+}
+
+.selected-folder {
+  width: 100%;
+  min-height: 38px;
+  padding: 9px 12px;
+  background: var(--bg-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ──────────────── Sidebar ──────────────── */
 .sidebar {
   width: 280px;

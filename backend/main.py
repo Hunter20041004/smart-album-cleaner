@@ -8,7 +8,10 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import os
+import platform
 import shutil
+import subprocess
 import sys
 import time
 import uuid
@@ -73,7 +76,8 @@ app.add_middleware(
 # Schemas
 # ──────────────────────────────────────────────────────────────────────────
 class ScanRequest(BaseModel):
-    folder: str
+    folder: str | None = None
+    paths: list[str] | None = None
 
 
 class TrashRequest(BaseModel):
@@ -86,6 +90,11 @@ class RestoreRequest(BaseModel):
     trash_paths: list[str] | None = None  # None = 全部還原
 
 
+class SystemTrashRequest(BaseModel):
+    folder: str
+    trash_paths: list[str] | None = None  # None = 全部移到系統垃圾桶
+
+
 # ──────────────────────────────────────────────────────────────────────────
 # Health
 # ──────────────────────────────────────────────────────────────────────────
@@ -96,6 +105,63 @@ def health():
         "model_loaded": MODEL_PATH.is_file(),
         "model_path": str(MODEL_PATH),
     }
+
+
+@app.post("/api/select-folder")
+def select_folder():
+    """Open a native folder picker on the local machine and return its path."""
+    system = platform.system()
+    if system == "Darwin":
+        script = (
+            'POSIX path of (choose folder with prompt '
+            '"選擇要掃描的照片資料夾")'
+        )
+        try:
+            result = subprocess.run(
+                ["osascript", "-e", script],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as e:
+            if e.returncode == 1:
+                return JSONResponse({"cancelled": True, "folder": None})
+            raise HTTPException(500, e.stderr.strip() or "無法開啟資料夾選擇器")
+        folder = result.stdout.strip().rstrip("/")
+        return {"cancelled": False, "folder": folder}
+
+    raise HTTPException(501, "目前僅支援 macOS 原生資料夾選擇器")
+
+
+@app.post("/api/select-files")
+def select_files():
+    """Open a native multi-file picker and return selected image paths."""
+    system = platform.system()
+    if system == "Darwin":
+        script = (
+            'set chosenFiles to choose file with prompt "選擇要掃描的照片" '
+            'of type {"public.image"} with multiple selections allowed\n'
+            'set output to ""\n'
+            'repeat with chosenFile in chosenFiles\n'
+            '  set output to output & POSIX path of chosenFile & linefeed\n'
+            'end repeat\n'
+            'return output'
+        )
+        try:
+            result = subprocess.run(
+                ["osascript", "-e", script],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as e:
+            if e.returncode == 1:
+                return JSONResponse({"cancelled": True, "paths": []})
+            raise HTTPException(500, e.stderr.strip() or "無法開啟照片選擇器")
+        paths = [p for p in result.stdout.splitlines() if p.strip()]
+        return {"cancelled": False, "paths": paths}
+
+    raise HTTPException(501, "目前僅支援 macOS 原生檔案選擇器")
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -117,6 +183,12 @@ def _list_scannable_images(folder: Path) -> list[Path]:
     return sorted(out)
 
 
+def _scan_root_for_files(images: list[Path]) -> Path:
+    """Use a stable root folder for selected files and Trash manifest storage."""
+    parents = [str(p.parent) for p in images]
+    return Path(os.path.commonpath(parents))
+
+
 def _save_face_thumb(face_rgb, item_path: Path) -> str:
     """把 AI 裁切的人臉(numpy RGB)存成 JPEG,回傳 cache 檔名(供前端取用)。"""
     # 用原始檔路徑 + mtime 當 hash key,確保檔案不變就直接用 cache
@@ -129,11 +201,11 @@ def _save_face_thumb(face_rgb, item_path: Path) -> str:
     return key
 
 
-def _run_scan_job(job_id: str, folder: Path) -> None:
+def _run_scan_job(job_id: str, folder: Path, images: list[Path] | None = None) -> None:
     """背景執行掃描;進度寫入 JOBS[job_id]。"""
     job = JOBS[job_id]
     try:
-        images = _list_scannable_images(folder)
+        images = images if images is not None else _list_scannable_images(folder)
         job["total"] = len(images)
         if not images:
             job["status"] = "done"
@@ -195,9 +267,24 @@ def _run_scan_job(job_id: str, folder: Path) -> None:
 
 @app.post("/api/scan")
 def start_scan(req: ScanRequest):
-    folder = Path(req.folder).expanduser()
-    if not folder.is_dir():
-        raise HTTPException(404, f"資料夾不存在:{folder}")
+    selected_images: list[Path] | None = None
+    if req.paths:
+        selected_images = []
+        for path_str in req.paths:
+            img = Path(path_str).expanduser()
+            if not img.is_file():
+                raise HTTPException(404, f"圖片不存在:{img}")
+            if img.suffix.lower() not in VALID_EXTS:
+                raise HTTPException(400, f"不支援的圖片格式:{img.name}")
+            selected_images.append(img)
+        folder = _scan_root_for_files(selected_images)
+    elif req.folder:
+        folder = Path(req.folder).expanduser()
+        if not folder.is_dir():
+            raise HTTPException(404, f"資料夾不存在:{folder}")
+    else:
+        raise HTTPException(400, "請先選擇資料夾或圖片")
+
     if not MODEL_PATH.is_file():
         raise HTTPException(503, "模型檔不存在,請先訓練或下載 models/mobilenet_face.pth")
 
@@ -211,7 +298,7 @@ def start_scan(req: ScanRequest):
         "results": None,
         "folder": str(folder),
     }
-    Thread(target=_run_scan_job, args=(job_id, folder), daemon=True).start()
+    Thread(target=_run_scan_job, args=(job_id, folder, selected_images), daemon=True).start()
     return {"job_id": job_id}
 
 
@@ -280,15 +367,96 @@ def _manifest_path(folder: Path) -> Path:
     return folder / "Trash" / "manifest.json"
 
 
+def _read_manifest(folder: Path) -> list[dict]:
+    mf = _manifest_path(folder)
+    if not mf.exists():
+        return []
+    try:
+        data = json.loads(mf.read_text(encoding="utf-8"))
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def _write_manifest(folder: Path, manifest: list[dict]) -> None:
+    mf = _manifest_path(folder)
+    mf.parent.mkdir(exist_ok=True)
+    mf.write_text(json.dumps(manifest, indent=2, ensure_ascii=False),
+                  encoding="utf-8")
+
+
+def _dedupe_manifest_entries(manifest: list[dict]) -> list[dict]:
+    """Keep one visible Trash entry for the same original file or same image copy."""
+    deduped: list[dict] = []
+    seen_keys: set[tuple[str, str]] = set()
+    for entry in sorted(
+        manifest,
+        key=lambda x: x.get("deleted_at", ""),
+        reverse=True,
+    ):
+        trash_path = Path(entry.get("trash_path", ""))
+        original_path = Path(entry.get("original_path", ""))
+        if not trash_path.is_file():
+            continue
+
+        try:
+            stat = trash_path.stat()
+            file_key = (original_path.name or trash_path.name, str(stat.st_size))
+        except OSError:
+            continue
+
+        original_key = ("original", str(original_path))
+        content_key = ("file", "::".join(file_key))
+        if original_key in seen_keys or content_key in seen_keys:
+            continue
+
+        seen_keys.add(original_key)
+        seen_keys.add(content_key)
+        deduped.append(entry)
+    return list(reversed(deduped))
+
+
+def _move_file_to_system_trash(path: Path) -> None:
+    if platform.system() != "Darwin":
+        raise RuntimeError("目前僅支援 macOS 系統垃圾桶")
+    script = (
+        'on run argv\n'
+        '  tell application "Finder"\n'
+        '    delete (POSIX file (item 1 of argv) as alias)\n'
+        '  end tell\n'
+        'end run'
+    )
+    subprocess.run(
+        ["osascript", "-e", script, "--", str(path)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
 @app.post("/api/trash")
 def move_to_trash(req: TrashRequest):
     folder = Path(req.folder)
     trash_dir = folder / "Trash"
     trash_dir.mkdir(exist_ok=True)
 
-    manifest: list[dict] = []
+    existing = _dedupe_manifest_entries(_read_manifest(folder))
+    active_keys: set[tuple[str, str]] = set()
+    for entry in existing:
+        trash_path = Path(entry["trash_path"])
+        original_path = Path(entry["original_path"])
+        try:
+            active_keys.add((
+                original_path.name or trash_path.name,
+                str(trash_path.stat().st_size),
+            ))
+        except OSError:
+            pass
+
+    new_entries: list[dict] = []
     moved: list[str] = []
     failed: list[str] = []
+    skipped: list[str] = []
 
     for path_str in req.paths:
         src = Path(path_str)
@@ -296,47 +464,49 @@ def move_to_trash(req: TrashRequest):
             failed.append(path_str)
             continue
         try:
+            if trash_dir in src.parents:
+                skipped.append(f"{path_str}: 已在 Trash")
+                continue
+            src_key = (src.name, str(src.stat().st_size))
+            if src_key in active_keys:
+                skipped.append(f"{path_str}: 已存在 Trash")
+                continue
+
             dest = trash_dir / src.name
             if dest.exists():
                 dest = trash_dir / (
                     f"{src.stem}_{datetime.now().strftime('%H%M%S')}{src.suffix}"
                 )
             shutil.move(str(src), str(dest))
-            manifest.append({
+            entry = {
                 "original_path": str(src),
                 "trash_path": str(dest),
                 "deleted_at": datetime.now().isoformat(),
-            })
+            }
+            new_entries.append(entry)
+            active_keys.add((dest.name, str(dest.stat().st_size)))
             moved.append(path_str)
         except Exception as e:
             failed.append(f"{path_str}: {e}")
 
-    # 更新 manifest
-    mf = _manifest_path(folder)
-    existing = []
-    if mf.exists():
-        try:
-            existing = json.loads(mf.read_text(encoding="utf-8"))
-        except Exception:
-            existing = []
-    existing.extend(manifest)
-    mf.write_text(json.dumps(existing, indent=2, ensure_ascii=False),
-                  encoding="utf-8")
+    existing.extend(new_entries)
+    existing = _dedupe_manifest_entries(existing)
+    _write_manifest(folder, existing)
 
-    return {"moved": moved, "failed": failed, "total_in_trash": len(existing)}
+    return {
+        "moved": moved,
+        "failed": failed,
+        "skipped": skipped,
+        "total_in_trash": len(existing),
+    }
 
 
 @app.get("/api/trash")
 def list_trash(folder: str = Query(...)):
     """列出指定資料夾下 Trash 的所有照片(含縮圖 URL)。"""
     folder_p = Path(folder)
-    mf = _manifest_path(folder_p)
-    if not mf.is_file():
-        return {"items": [], "total": 0}
-    try:
-        manifest = json.loads(mf.read_text(encoding="utf-8"))
-    except Exception:
-        return {"items": [], "total": 0}
+    manifest = _dedupe_manifest_entries(_read_manifest(folder_p))
+    _write_manifest(folder_p, manifest)
 
     items = []
     for entry in manifest:
@@ -397,6 +567,48 @@ def restore_from_trash(req: RestoreRequest):
     mf.write_text(json.dumps(remaining, indent=2, ensure_ascii=False),
                   encoding="utf-8")
     return {"restored": restored, "failed": failed, "remaining": len(remaining)}
+
+
+@app.post("/api/trash/system-delete")
+def move_trash_items_to_system_trash(req: SystemTrashRequest):
+    folder = Path(req.folder)
+    mf = _manifest_path(folder)
+    if not mf.is_file():
+        return {"deleted": 0, "failed": [], "remaining": 0}
+
+    try:
+        manifest = json.loads(mf.read_text(encoding="utf-8"))
+    except Exception:
+        return {"deleted": 0, "failed": [], "remaining": 0}
+
+    target_set = set(req.trash_paths or [])  # 空 = 全部移到系統垃圾桶
+    deleted = 0
+    failed: list[str] = []
+    remaining: list[dict] = []
+
+    for entry in manifest:
+        trash_path = entry["trash_path"]
+        if target_set and trash_path not in target_set:
+            remaining.append(entry)
+            continue
+
+        src = Path(trash_path)
+        if not src.is_file():
+            deleted += 1
+            continue
+        try:
+            _move_file_to_system_trash(src)
+            deleted += 1
+        except subprocess.CalledProcessError as e:
+            failed.append(f"{src}: {e.stderr.strip() or e}")
+            remaining.append(entry)
+        except Exception as e:
+            failed.append(f"{src}: {e}")
+            remaining.append(entry)
+
+    mf.write_text(json.dumps(remaining, indent=2, ensure_ascii=False),
+                  encoding="utf-8")
+    return {"deleted": deleted, "failed": failed, "remaining": len(remaining)}
 
 
 # ──────────────────────────────────────────────────────────────────────────
