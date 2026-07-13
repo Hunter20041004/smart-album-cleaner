@@ -5,11 +5,53 @@ import subprocess
 import tomllib
 from pathlib import Path
 
+import pytest
 from fastapi import FastAPI
 
 from backend.main import app as backend_app
 
 ROOT = Path(__file__).resolve().parents[1]
+EXPECTED_ERROR_OUTPUTS = [
+    ("sample-001", "Good", "Bad", "89.2", "0.892"),
+    ("sample-002", "Bad", "Good", "86.1", "0.139"),
+    ("sample-003", "Bad", "Good", "78.3", "0.217"),
+    ("sample-004", "Good", "Bad", "74.9", "0.749"),
+    ("sample-005", "Good", "Bad", "72.9", "0.729"),
+    ("sample-006", "Bad", "Good", "72.8", "0.272"),
+    ("sample-007", "Good", "Bad", "70.8", "0.708"),
+    ("sample-008", "Good", "Bad", "70.5", "0.705"),
+    ("sample-009", "Good", "Bad", "69.5", "0.695"),
+    ("sample-010", "Bad", "Good", "68.4", "0.316"),
+]
+EXPECTED_ERROR_IDS = [output[0] for output in EXPECTED_ERROR_OUTPUTS]
+ERROR_REPORT_HEADER = "Top 10 「最自信卻錯了」的測試樣本 — 看這些可以理解模型瓶頸"
+ERROR_REPORT_ROW = re.compile(
+    r"\s*\d+\.\s+(sample-\d{3})\s+"
+    r"\[真實:(Good|Bad)\s*→\s*預測:(Good|Bad)\s*\]"
+    r"\s+信心\s+(\d+\.\d)%\s+P\(Bad\)=(\d+\.\d+)"
+)
+
+
+def _validate_error_report(report: str) -> list[tuple[str, ...]]:
+    assert "/Users/" not in report
+    assert "\\Users\\" not in report
+    assert not re.search(r"\bIMG[_-]?\d+", report, re.IGNORECASE)
+    assert not re.search(
+        r"\.(?:jpe?g|png|heic|webp|bmp|gif|tiff?)\b", report, re.IGNORECASE
+    )
+    assert "/" not in report and "\\" not in report
+
+    outputs = []
+    for line in report.splitlines():
+        if not line.strip():
+            continue
+        if line == ERROR_REPORT_HEADER or re.fullmatch(r"─+", line):
+            continue
+        match = ERROR_REPORT_ROW.fullmatch(line)
+        assert match is not None
+        outputs.append(match.groups())
+    assert [output[0] for output in outputs] == EXPECTED_ERROR_IDS
+    return outputs
 
 
 def test_canonical_fastapi_vue_entrypoints_are_wired():
@@ -109,30 +151,34 @@ def test_install_manifest_has_no_streamlit_runtime():
 
 def test_error_report_contains_only_anonymous_sample_ids():
     report = (ROOT / "reports" / "top_errors.txt").read_text(encoding="utf-8")
-    expected_outputs = [
-        ("sample-001", "Good", "Bad", "89.2", "0.892"),
-        ("sample-002", "Bad", "Good", "86.1", "0.139"),
-        ("sample-003", "Bad", "Good", "78.3", "0.217"),
-        ("sample-004", "Good", "Bad", "74.9", "0.749"),
-        ("sample-005", "Good", "Bad", "72.9", "0.729"),
-        ("sample-006", "Bad", "Good", "72.8", "0.272"),
-        ("sample-007", "Good", "Bad", "70.8", "0.708"),
-        ("sample-008", "Good", "Bad", "70.5", "0.705"),
-        ("sample-009", "Good", "Bad", "69.5", "0.695"),
-        ("sample-010", "Bad", "Good", "68.4", "0.316"),
-    ]
 
-    assert "/Users/" not in report
-    assert "\\Users\\" not in report
-    assert not re.search(r"\bIMG[_-]?\d+", report, re.IGNORECASE)
-    assert "/" not in report and "\\" not in report
+    assert _validate_error_report(report) == EXPECTED_ERROR_OUTPUTS
 
-    outputs = re.findall(
-        r"(sample-\d{3})\s+\[真實:(Good|Bad)\s*→\s*預測:(Good|Bad)\s*\]"
-        r"\s+信心\s+(\d+\.\d)%\s+P\(Bad\)=(\d+\.\d+)",
-        report,
+
+def test_error_report_rejects_image_basename_line():
+    report = (ROOT / "reports" / "top_errors.txt").read_text(encoding="utf-8")
+
+    with pytest.raises(AssertionError):
+        _validate_error_report(f"{report}\nD 壞 (15).jpg")
+
+
+def test_error_report_rejects_extra_sample_id():
+    report = (ROOT / "reports" / "top_errors.txt").read_text(encoding="utf-8")
+    extra_row = (
+        "11. sample-011 [真實:Good → 預測:Bad ] "
+        "信心  50.0%  P(Bad)=0.500"
     )
-    ids = [output[0] for output in outputs]
 
-    assert outputs == expected_outputs
-    assert len(ids) == len(set(ids))
+    with pytest.raises(AssertionError):
+        _validate_error_report(f"{report}\n{extra_row}")
+
+
+def test_error_report_rejects_duplicate_sample_id():
+    report = (ROOT / "reports" / "top_errors.txt").read_text(encoding="utf-8")
+    duplicate_row = (
+        "11. sample-001 [真實:Good → 預測:Bad ] "
+        "信心  89.2%  P(Bad)=0.892"
+    )
+
+    with pytest.raises(AssertionError):
+        _validate_error_report(f"{report}\n{duplicate_row}")
