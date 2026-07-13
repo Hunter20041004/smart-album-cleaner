@@ -182,3 +182,75 @@ def test_error_report_rejects_duplicate_sample_id():
 
     with pytest.raises(AssertionError):
         _validate_error_report(f"{report}\n{duplicate_row}")
+
+
+def test_model_card_states_evidence_and_limits():
+    card = (ROOT / "docs/MODEL_CARD.md").read_text(encoding="utf-8")
+    for heading in (
+        "## Intended Use",
+        "## Data",
+        "## Evaluation",
+        "## Class-level Results",
+        "## Limitations and Bias",
+        "## Human Review and Recovery",
+    ):
+        assert heading in card
+    assert "75.1%" in card
+    assert "subjective" in card.casefold()
+    assert "Trash" in card
+    assert "not identity recognition" in card.casefold()
+
+
+def test_readme_does_not_make_unqualified_speed_claims():
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "60 秒內" not in readme
+    assert "1000 張 < 2 分鐘" not in readme
+
+
+def test_readme_summarizes_model_evidence_and_limits():
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert "75.1% accuracy on 193 labelled test examples" in readme
+    assert "Performance depends on hardware and image size" in readme
+    assert "[Model Card](docs/MODEL_CARD.md)" in readme
+
+
+def test_model_card_records_verified_release_artifact():
+    card = (ROOT / "docs/MODEL_CARD.md").read_text(encoding="utf-8")
+
+    assert "Release tag: `v1.0.0`" in card
+    assert (
+        "SHA-256: `b7dd3b7d95c13c07167d269d65f49367d0b0007fcf0dc272ab1f94c34f3f4bf0`"
+        in card
+    )
+
+
+def test_classifier_release_download_is_pinned_and_verified():
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    card = (ROOT / "docs/MODEL_CARD.md").read_text(encoding="utf-8")
+    release_url = (
+        "https://github.com/Hunter20041004/smart-album-cleaner/"
+        "releases/download/v1.0.0/mobilenet_face.pth"
+    )
+    digest = "b7dd3b7d95c13c07167d269d65f49367d0b0007fcf0dc272ab1f94c34f3f4bf0"
+    macos = readme.split("### macOS / Linux", maxsplit=1)[1].split(
+        "### Windows", maxsplit=1
+    )[0]
+    windows = readme.split("### Windows", maxsplit=1)[1].split(
+        "## 開發模式", maxsplit=1
+    )[0]
+
+    assert "releases/latest/download/mobilenet_face.pth" not in readme
+    assert readme.count(release_url) == 2
+    assert readme.count(digest) == 2
+    assert 'MODEL_TMP="$(mktemp)"' in macos
+    assert "shasum -a 256 -c -" in macos
+    assert macos.index("curl -fL") < macos.index("shasum -a 256 -c -")
+    assert macos.index("shasum -a 256 -c -") < macos.index(
+        'mv "$MODEL_TMP" models/mobilenet_face.pth'
+    )
+    assert "%TEMP%" in windows
+    assert "Get-FileHash" in windows
+    assert windows.index("curl -fL") < windows.index("Get-FileHash")
+    assert windows.index("Get-FileHash") < windows.index("Move-Item")
+    assert "Size: `12,098,423 bytes`" in card

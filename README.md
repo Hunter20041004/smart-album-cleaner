@@ -4,6 +4,8 @@ Smart Album Cleaner 是在本機執行的照片整理工具。它使用 MobileNe
 
 目前唯一的應用程式架構是 **FastAPI + Vue 3**：`backend/main.py` 提供 REST API 並服務建置後的前端，`frontend/` 是 Vue 3 SPA。專案不再提供另一套 Web UI 入口。
 
+**Evidence summary (English):** The tracked evaluation reports **75.1% accuracy on 193 labelled test examples** for the subjective binary `Good`/`Bad` task (`Bad` recall 82.8%; `Good` recall 67.0%). This result does not establish real-world, subgroup, or identity-recognition performance. Performance depends on hardware and image size; no reproducible runtime benchmark is tracked. See the [Model Card](docs/MODEL_CARD.md) for evidence, class-level results, and limitations.
+
 ## 功能範圍
 
 - 選擇本機照片資料夾或檔案後啟動掃描工作。
@@ -22,9 +24,15 @@ Smart Album Cleaner 是在本機執行的照片整理工具。它使用 MobileNe
 git clone https://github.com/Hunter20041004/smart-album-cleaner.git
 cd smart-album-cleaner
 
+MODEL_URL=https://github.com/Hunter20041004/smart-album-cleaner/releases/download/v1.0.0/mobilenet_face.pth
+MODEL_SHA256=b7dd3b7d95c13c07167d269d65f49367d0b0007fcf0dc272ab1f94c34f3f4bf0
+MODEL_TMP="$(mktemp)"
+trap 'rm -f "$MODEL_TMP"' EXIT
+curl -fL "$MODEL_URL" -o "$MODEL_TMP"
+printf '%s  %s\n' "$MODEL_SHA256" "$MODEL_TMP" | shasum -a 256 -c -
 mkdir -p models
-curl -L https://github.com/Hunter20041004/smart-album-cleaner/releases/latest/download/mobilenet_face.pth \
-  -o models/mobilenet_face.pth
+mv "$MODEL_TMP" models/mobilenet_face.pth
+trap - EXIT
 
 ./run.sh
 ```
@@ -39,8 +47,15 @@ curl -L https://github.com/Hunter20041004/smart-album-cleaner/releases/latest/do
 git clone https://github.com/Hunter20041004/smart-album-cleaner.git
 cd smart-album-cleaner
 
-mkdir models
-curl -L https://github.com/Hunter20041004/smart-album-cleaner/releases/latest/download/mobilenet_face.pth -o models/mobilenet_face.pth
+set "MODEL_URL=https://github.com/Hunter20041004/smart-album-cleaner/releases/download/v1.0.0/mobilenet_face.pth"
+set "MODEL_SHA256=b7dd3b7d95c13c07167d269d65f49367d0b0007fcf0dc272ab1f94c34f3f4bf0"
+set "MODEL_TMP=%TEMP%\mobilenet_face-%RANDOM%.pth"
+curl -fL "%MODEL_URL%" -o "%MODEL_TMP%"
+if errorlevel 1 (
+  del /q "%MODEL_TMP%" 2>nul
+  exit /b 1
+)
+powershell -NoProfile -Command "try { $actual=(Get-FileHash -LiteralPath $env:MODEL_TMP -Algorithm SHA256).Hash.ToLower(); if ($actual -ne $env:MODEL_SHA256) { throw 'classifier checksum mismatch' }; New-Item -ItemType Directory -Force -Path models | Out-Null; Move-Item -LiteralPath $env:MODEL_TMP -Destination models/mobilenet_face.pth -Force } finally { Remove-Item -LiteralPath $env:MODEL_TMP -Force -ErrorAction SilentlyContinue }"
 
 python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
