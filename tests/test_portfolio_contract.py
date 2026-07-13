@@ -5,10 +5,12 @@ import shlex
 import struct
 import subprocess
 import tomllib
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
 from fastapi import FastAPI
+from PIL import Image
 
 from backend.main import app as backend_app
 
@@ -174,25 +176,113 @@ def test_frontend_exposes_portfolio_capture_command():
     assert "@playwright/test" in package["devDependencies"]
 
 
-def test_portfolio_dashboard_is_exact_synthetic_png():
-    screenshot = (ROOT / "docs/screenshots/dashboard.png").read_bytes()
+def _validate_portfolio_png(path: Path) -> None:
+    screenshot = path.read_bytes()
 
     assert screenshot[:8] == b"\x89PNG\r\n\x1a\n"
     assert struct.unpack(">II", screenshot[16:24]) == (1440, 900)
+    with Image.open(path) as image:
+        assert image.format == "PNG"
+        assert image.mode == "RGB"
+        assert image.size == (1440, 900)
+        image.verify()
+    with Image.open(path) as image:
+        image.load()
+        assert image.mode == "RGB"
+        assert image.size == (1440, 900)
 
-    fixture_source = (
-        ROOT / "frontend/e2e/portfolio-evidence.spec.js"
-    ).read_text(encoding="utf-8")
+
+def _validate_portfolio_fixture_source(fixture_source: str) -> None:
+    expected_samples = [f"sample-{index:03}.jpg" for index in range(1, 7)]
     image_basenames = re.findall(
         r"[A-Za-z0-9_ -]+\.(?:jpe?g|png|heic|webp|bmp|gif|tiff?)",
         fixture_source,
         re.IGNORECASE,
     )
-    assert image_basenames
-    assert all(
-        name == "dashboard.png" or re.fullmatch(r"sample-\d{3}\.jpg", name)
-        for name in image_basenames
+    fixture_paths = re.findall(r"\bpath: '([^']+)'", fixture_source)
+    fixture_classes = set(
+        re.findall(
+            r"^  (Good|Bad|NoFace): \[$", fixture_source, re.MULTILINE
+        )
     )
+
+    assert fixture_paths == expected_samples
+    assert set(image_basenames) == {"dashboard.png", *expected_samples}
+    assert fixture_classes == {"Good", "Bad", "NoFace"}
+
+    svg_function = re.search(
+        r"function solidSvg\(color\) \{\s+return `(?P<svg><svg.*?</svg>)`\s+\}",
+        fixture_source,
+        re.DOTALL,
+    )
+    assert svg_function is not None
+    svg = ET.fromstring(
+        svg_function.group("svg").replace("${color}", "#000000")
+    )
+    namespace = "{http://www.w3.org/2000/svg}"
+    assert svg.tag == f"{namespace}svg"
+    assert svg.attrib == {
+        "width": "320",
+        "height": "240",
+        "viewBox": "0 0 320 240",
+    }
+    assert len(svg) == 1
+    assert svg[0].tag == f"{namespace}rect"
+    assert svg[0].attrib == {
+        "width": "320",
+        "height": "240",
+        "fill": "#000000",
+    }
+
+
+def test_portfolio_png_validator_rejects_truncated_image(tmp_path):
+    valid_png = (ROOT / "docs/screenshots/dashboard.png").read_bytes()
+    truncated_png = tmp_path / "truncated.png"
+    truncated_png.write_bytes(valid_png[:24])
+
+    with pytest.raises(OSError):
+        _validate_portfolio_png(truncated_png)
+
+
+def test_portfolio_fixture_validator_rejects_missing_sample_classes():
+    fixture_source = (
+        ROOT / "frontend/e2e/portfolio-evidence.spec.js"
+    ).read_text(encoding="utf-8")
+    hostile_source, replacements = re.subn(
+        r"const items = \{.*?\n\}\n\n(?=function solidSvg)",
+        "const items = {}\n\n",
+        fixture_source,
+        count=1,
+        flags=re.DOTALL,
+    )
+    assert replacements == 1
+
+    with pytest.raises(AssertionError):
+        _validate_portfolio_fixture_source(hostile_source)
+
+
+def test_portfolio_fixture_validator_rejects_external_svg_image():
+    fixture_source = (
+        ROOT / "frontend/e2e/portfolio-evidence.spec.js"
+    ).read_text(encoding="utf-8")
+    hostile_source = fixture_source.replace(
+        '<rect width="320" height="240" fill="${color}"/>',
+        '<image width="320" height="240" href="file:///private/photo"/>',
+        1,
+    )
+    assert hostile_source != fixture_source
+
+    with pytest.raises(AssertionError):
+        _validate_portfolio_fixture_source(hostile_source)
+
+
+def test_portfolio_dashboard_is_exact_synthetic_png():
+    _validate_portfolio_png(ROOT / "docs/screenshots/dashboard.png")
+
+    fixture_source = (
+        ROOT / "frontend/e2e/portfolio-evidence.spec.js"
+    ).read_text(encoding="utf-8")
+    _validate_portfolio_fixture_source(fixture_source)
 
 
 def test_readme_states_current_macos_ui_limit():

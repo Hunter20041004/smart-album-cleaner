@@ -25,41 +25,90 @@ function solidSvg(color) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240" viewBox="0 0 320 240"><rect width="320" height="240" fill="${color}"/></svg>`
 }
 
+async function installApiFixtureRouter(page, unexpectedRequests) {
+  await page.route('**/api/**', async route => {
+    const request = route.request()
+    const pathname = new URL(request.url()).pathname
+    const key = `${request.method()} ${pathname}`
+
+    if (key === 'GET /api/health') {
+      await route.fulfill({
+        json: { status: 'ok', model_loaded: true, model_path: 'synthetic-model' },
+      })
+      return
+    }
+    if (key === 'POST /api/select-folder') {
+      await route.fulfill({ json: { cancelled: false, folder: album } })
+      return
+    }
+    if (key === 'POST /api/scan') {
+      await route.fulfill({ json: { job_id: 'demo-job' } })
+      return
+    }
+    if (key === 'GET /api/scan/demo-job') {
+      await new Promise(resolve => setTimeout(resolve, 150))
+      await route.fulfill({
+        json: {
+          status: 'done',
+          current: 6,
+          total: 6,
+          current_name: 'sample-006.jpg',
+          eta_seconds: 0,
+          folder: album,
+          results: items,
+        },
+      })
+      return
+    }
+    if (key === 'GET /api/image') {
+      await route.fulfill({
+        contentType: 'image/svg+xml',
+        body: solidSvg('#d7c7a5'),
+      })
+      return
+    }
+    if (request.method() === 'GET' && /^\/api\/face\/[^/]+$/.test(pathname)) {
+      await route.fulfill({
+        contentType: 'image/svg+xml',
+        body: solidSvg('#b88a66'),
+      })
+      return
+    }
+
+    unexpectedRequests.push(key)
+    await route.abort('blockedbyclient')
+  })
+}
+
+test('blocks API requests outside the synthetic fixture allowlist', async ({ page }) => {
+  const fallbackRequests = []
+  const unexpectedRequests = []
+  await page.route('**/api/**', route => {
+    fallbackRequests.push(route.request().url())
+    return route.fulfill({ status: 418, body: 'unexpected fallback' })
+  })
+  await installApiFixtureRouter(page, unexpectedRequests)
+  await page.goto('/')
+
+  const result = await page.evaluate(async () => {
+    try {
+      const response = await fetch('/api/unexpected')
+      return { blocked: false, status: response.status }
+    } catch {
+      return { blocked: true }
+    }
+  })
+
+  expect(result).toEqual({ blocked: true })
+  expect(fallbackRequests).toEqual([])
+  expect(unexpectedRequests).toEqual(['GET /api/unexpected'])
+})
+
 test('captures the real review-before-trash flow with synthetic fixtures', async ({ page }) => {
   const pageErrors = []
+  const unexpectedRequests = []
   page.on('pageerror', error => pageErrors.push(error.message))
-
-  await page.route('**/api/health', route => route.fulfill({
-    json: { status: 'ok', model_loaded: true, model_path: 'synthetic-model' },
-  }))
-  await page.route('**/api/select-folder', route => route.fulfill({
-    json: { cancelled: false, folder: album },
-  }))
-  await page.route('**/api/scan', route => route.fulfill({
-    json: { job_id: 'demo-job' },
-  }))
-  await page.route('**/api/scan/demo-job', async route => {
-    await new Promise(resolve => setTimeout(resolve, 150))
-    await route.fulfill({
-      json: {
-        status: 'done',
-        current: 6,
-        total: 6,
-        current_name: 'sample-006.jpg',
-        eta_seconds: 0,
-        folder: album,
-        results: items,
-      },
-    })
-  })
-  await page.route('**/api/image?*', route => route.fulfill({
-    contentType: 'image/svg+xml',
-    body: solidSvg('#d7c7a5'),
-  }))
-  await page.route('**/api/face/*', route => route.fulfill({
-    contentType: 'image/svg+xml',
-    body: solidSvg('#b88a66'),
-  }))
+  await installApiFixtureRouter(page, unexpectedRequests)
 
   await page.goto('/')
   await expect(page.getByText('使用流程')).toBeVisible()
@@ -82,10 +131,11 @@ test('captures the real review-before-trash flow with synthetic fixtures', async
     [...document.images].every(image => image.complete && image.naturalWidth > 0)
   ))
 
-  expect(pageErrors).toEqual([])
   await page.screenshot({
     path: screenshotPath,
     animations: 'disabled',
     fullPage: false,
   })
+  expect(pageErrors).toEqual([])
+  expect(unexpectedRequests).toEqual([])
 })
