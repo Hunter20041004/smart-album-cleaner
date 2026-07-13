@@ -24,11 +24,12 @@ Smart Album Cleaner 是在本機執行的照片整理工具。它使用 MobileNe
 git clone https://github.com/Hunter20041004/smart-album-cleaner.git
 cd smart-album-cleaner
 
+set -euo pipefail
 MODEL_URL=https://github.com/Hunter20041004/smart-album-cleaner/releases/download/v1.0.0/mobilenet_face.pth
 MODEL_SHA256=b7dd3b7d95c13c07167d269d65f49367d0b0007fcf0dc272ab1f94c34f3f4bf0
 MODEL_TMP="$(mktemp)"
 trap 'rm -f "$MODEL_TMP"' EXIT
-curl -fL "$MODEL_URL" -o "$MODEL_TMP"
+curl --fail --location --show-error "$MODEL_URL" -o "$MODEL_TMP"
 printf '%s  %s\n' "$MODEL_SHA256" "$MODEL_TMP" | shasum -a 256 -c -
 mkdir -p models
 mv "$MODEL_TMP" models/mobilenet_face.pth
@@ -56,6 +57,7 @@ if errorlevel 1 (
   exit /b 1
 )
 powershell -NoProfile -Command "try { $actual=(Get-FileHash -LiteralPath $env:MODEL_TMP -Algorithm SHA256).Hash.ToLower(); if ($actual -ne $env:MODEL_SHA256) { throw 'classifier checksum mismatch' }; New-Item -ItemType Directory -Force -Path models | Out-Null; Move-Item -LiteralPath $env:MODEL_TMP -Destination models/mobilenet_face.pth -Force } finally { Remove-Item -LiteralPath $env:MODEL_TMP -Force -ErrorAction SilentlyContinue }"
+if errorlevel 1 exit /b 1
 
 python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt

@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import shlex
 import subprocess
@@ -52,6 +53,69 @@ def _validate_error_report(report: str) -> list[tuple[str, ...]]:
         outputs.append(match.groups())
     assert [output[0] for output in outputs] == EXPECTED_ERROR_IDS
     return outputs
+
+
+def _classifier_install_bash_block() -> str:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    macos = readme.split("### macOS / Linux", maxsplit=1)[1].split(
+        "### Windows", maxsplit=1
+    )[0]
+    code = macos.split("```bash", maxsplit=1)[1].split("```", maxsplit=1)[0]
+    return code.split("cd smart-album-cleaner", maxsplit=1)[1].split(
+        "./run.sh", maxsplit=1
+    )[0]
+
+
+def _run_classifier_install_bash_block(tmp_path: Path, shasum_exit: int):
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir(parents=True)
+    event_log = tmp_path / "events.log"
+    curl = fake_bin / "curl"
+    curl.write_text(
+        "#!/bin/sh\n"
+        "while [ \"$#\" -gt 0 ]; do\n"
+        "  if [ \"$1\" = \"-o\" ]; then\n"
+        "    shift\n"
+        "    printf 'fake classifier' > \"$1\"\n"
+        "    exit 0\n"
+        "  fi\n"
+        "  shift\n"
+        "done\n"
+        "exit 2\n",
+        encoding="utf-8",
+    )
+    shasum = fake_bin / "shasum"
+    shasum.write_text(
+        "#!/bin/sh\n"
+        "printf 'verify\\n' >> \"$EVENT_LOG\"\n"
+        "exit \"$SHASUM_EXIT\"\n",
+        encoding="utf-8",
+    )
+    mv = fake_bin / "mv"
+    mv.write_text(
+        "#!/bin/sh\n"
+        "printf 'move\\n' >> \"$EVENT_LOG\"\n"
+        "/bin/mv \"$@\"\n",
+        encoding="utf-8",
+    )
+    curl.chmod(0o755)
+    shasum.chmod(0o755)
+    mv.chmod(0o755)
+    env = os.environ | {
+        "EVENT_LOG": str(event_log),
+        "PATH": f"{fake_bin}:{os.environ['PATH']}",
+        "SHASUM_EXIT": str(shasum_exit),
+        "TMPDIR": str(tmp_path),
+    }
+    completed = subprocess.run(
+        ["bash", "-c", _classifier_install_bash_block()],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    events = event_log.read_text(encoding="utf-8").splitlines()
+    return completed, events
 
 
 def test_canonical_fastapi_vue_entrypoints_are_wired():
@@ -245,7 +309,7 @@ def test_classifier_release_download_is_pinned_and_verified():
     assert readme.count(digest) == 2
     assert 'MODEL_TMP="$(mktemp)"' in macos
     assert "shasum -a 256 -c -" in macos
-    assert macos.index("curl -fL") < macos.index("shasum -a 256 -c -")
+    assert macos.index("curl --fail") < macos.index("shasum -a 256 -c -")
     assert macos.index("shasum -a 256 -c -") < macos.index(
         'mv "$MODEL_TMP" models/mobilenet_face.pth'
     )
@@ -254,3 +318,90 @@ def test_classifier_release_download_is_pinned_and_verified():
     assert windows.index("curl -fL") < windows.index("Get-FileHash")
     assert windows.index("Get-FileHash") < windows.index("Move-Item")
     assert "Size: `12,098,423 bytes`" in card
+
+
+def test_classifier_install_bash_block_fails_closed_before_move(tmp_path):
+    failed, failed_events = _run_classifier_install_bash_block(
+        tmp_path / "failed", shasum_exit=1
+    )
+    succeeded, succeeded_events = _run_classifier_install_bash_block(
+        tmp_path / "succeeded", shasum_exit=0
+    )
+
+    assert failed.returncode != 0
+    assert failed_events == ["verify"]
+    assert not (tmp_path / "failed/models/mobilenet_face.pth").exists()
+    assert succeeded.returncode == 0
+    assert succeeded_events == ["verify", "move"]
+    assert (tmp_path / "succeeded/models/mobilenet_face.pth").is_file()
+
+
+def test_windows_classifier_verification_has_fail_closed_control_flow():
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    windows = readme.split("### Windows", maxsplit=1)[1].split(
+        "## 開發模式", maxsplit=1
+    )[0]
+    after_verification = windows.split("powershell -NoProfile", maxsplit=1)[1]
+    guard = "if errorlevel 1 exit /b 1"
+
+    assert guard in after_verification
+    assert after_verification.index(guard) < after_verification.index(
+        "python -m venv"
+    )
+
+
+def test_model_card_matches_tracked_report_and_states_safety_limits():
+    report = (ROOT / "reports/classification_report.txt").read_text(
+        encoding="utf-8"
+    )
+    card = (ROOT / "docs/MODEL_CARD.md").read_text(encoding="utf-8")
+    report_test_count = re.search(r"^Test n:\s*(\d+)$", report, re.MULTILINE)
+    report_threshold = re.search(
+        r"^Threshold \(P\(Bad\)\):\s*(\d+\.\d+)$", report, re.MULTILINE
+    )
+    card_test_count = re.search(r"test set of (\d+) examples", card)
+    card_threshold = re.search(r"decision threshold of (\d+\.\d+)", card)
+    report_metrics = {
+        match.group(1): match.groups()[1:]
+        for match in re.finditer(
+            r"^\s*(Bad|Good)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+"
+            r"(\d+\.\d+)\s+(\d+)$",
+            report,
+            re.MULTILINE,
+        )
+    }
+    card_metrics = {
+        match.group(1): match.groups()[1:]
+        for match in re.finditer(
+            r"^\| `(Bad|Good)` \| (\d+\.\d+) \| (\d+\.\d+) \| "
+            r"(\d+\.\d+) \| (\d+) \|$",
+            card,
+            re.MULTILINE,
+        )
+    }
+    data_limits = " ".join(
+        card.split("## Data", maxsplit=1)[1]
+        .split("## Evaluation", maxsplit=1)[0]
+        .casefold()
+        .split()
+    )
+    recovery = " ".join(
+        card.split("## Human Review and Recovery", maxsplit=1)[1]
+        .split("## Model Artifact Integrity", maxsplit=1)[0]
+        .casefold()
+        .split()
+    )
+
+    assert report_test_count is not None
+    assert report_threshold is not None
+    assert card_test_count is not None
+    assert card_threshold is not None
+    assert card_test_count.group(1) == report_test_count.group(1) == "193"
+    assert card_threshold.group(1) == report_threshold.group(1)
+    assert set(report_metrics) == {"Bad", "Good"}
+    assert card_metrics == report_metrics
+    for unknown in ("origin", "consent", "licence", "split independence"):
+        assert unknown in data_limits
+    assert "unknown" in data_limits
+    assert "split independence therefore cannot be confirmed" in data_limits
+    assert "irreversible deletion without an explicit human decision" in recovery
