@@ -114,6 +114,7 @@ run.sh                      macOS / Linux 本機啟動腳本
 ## 驗證
 
 ```bash
+.venv/bin/python -m pip install -r requirements-dev.txt
 .venv/bin/python -m pytest -q
 .venv/bin/python -m ruff check .
 cd frontend && npm install && npm run build

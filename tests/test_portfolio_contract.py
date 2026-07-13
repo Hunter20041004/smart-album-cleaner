@@ -1,6 +1,7 @@
 import json
 import shlex
 import subprocess
+import tomllib
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -41,6 +42,27 @@ def test_readme_states_current_macos_ui_limit():
 
     assert "原生資料夾／檔案選擇器與完整 UI 掃描流程目前僅支援 macOS" in readme
     assert "Windows 指令僅供前後端開發啟動" in readme
+
+
+def test_package_metadata_targets_macos():
+    project = tomllib.loads(
+        (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    )["project"]
+
+    assert "Operating System :: OS Independent" not in project["classifiers"]
+    assert "Operating System :: MacOS :: MacOS X" in project["classifiers"]
+
+
+def test_readme_installs_verification_prerequisites_before_checks():
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    verification = readme.split("## 驗證", maxsplit=1)[1]
+    install = ".venv/bin/python -m pip install -r requirements-dev.txt"
+    pytest = ".venv/bin/python -m pytest -q"
+    ruff = ".venv/bin/python -m ruff check ."
+
+    assert install in verification
+    assert verification.index(install) < verification.index(pytest)
+    assert verification.index(install) < verification.index(ruff)
 
 
 def test_no_streamlit_configuration_is_tracked():
