@@ -30,8 +30,10 @@ from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 from torchvision.datasets import ImageFolder
 from torchvision.models import (
-    MobileNet_V2_Weights, mobilenet_v2,
-    MobileNet_V3_Large_Weights, mobilenet_v3_large,
+    MobileNet_V2_Weights,
+    MobileNet_V3_Large_Weights,
+    mobilenet_v2,
+    mobilenet_v3_large,
 )
 
 NUM_CLASSES = 2
@@ -263,7 +265,7 @@ def train(
                 f"--finetune 需要先存在的 checkpoint:{out_path}\n"
                 "請先跑一次 stage-1 訓練(不加 --finetune)"
             )
-        ckpt = torch.load(out_path, map_location=device, weights_only=False)
+        ckpt = torch.load(out_path, map_location=device, weights_only=True)
         # 防呆:checkpoint 的 arch 跟現在指定的不一致 → 拒絕載入避免錯誤覆寫
         ckpt_arch = ckpt.get("arch", "mobilenet_v2")  # 舊版 checkpoint 沒寫 arch,預設 v2
         if ckpt_arch != arch:
@@ -324,7 +326,7 @@ def train(
         print(f"\n[done] best val_acc={best_acc:.3f} @ epoch {best_epoch} → {out_path}")
 
     # 用「最佳那次」的權重再做一次決策閾值調校
-    best_ckpt = torch.load(out_path, map_location=device, weights_only=False)
+    best_ckpt = torch.load(out_path, map_location=device, weights_only=True)
     model.load_state_dict(best_ckpt["state_dict"])
     best_thr, thr_acc = _find_best_threshold(model, val_loader, device, classes)
     print(f"[threshold] 掃描 0.30~0.70 → 最佳 P(Bad) 閾值 = {best_thr:.2f}  "

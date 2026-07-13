@@ -19,8 +19,10 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from src.predict_face import (
+from src.face_detector import FaceBox  # noqa: E402
+from src.predict_face import (  # noqa: E402
     NoFaceDetectedError,
+    _detect_largest_face,
     _load_bgr,
     predict_image_quality,
 )
@@ -70,6 +72,19 @@ def test_load_bgr_reads_real_jpg(blank_image):
     arr = _load_bgr(blank_image)
     assert arr.shape == (480, 640, 3)
     assert arr.dtype == np.uint8
+
+
+def test_detect_largest_face_uses_tasks_absolute_boxes():
+    detector = MagicMock()
+    detector.detect.return_value = [
+        FaceBox(x=5, y=5, width=20, height=20),
+        FaceBox(x=10, y=20, width=50, height=60),
+    ]
+    image = np.zeros((200, 200, 3), dtype=np.uint8)
+
+    with patch("src.predict_face._get_detector", return_value=detector):
+        # Existing crop behavior squares the 50x60 box around its center.
+        assert _detect_largest_face(image, min_face_px=10, margin=0) == (5, 20, 65, 80)
 
 
 # ── NoFaceDetectedError 路徑 ────────────────────────────────────────

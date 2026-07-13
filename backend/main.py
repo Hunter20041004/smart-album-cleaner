@@ -6,27 +6,25 @@ FastAPI 後端 — AI 表情相簿管家 v2.0
 from __future__ import annotations
 
 import hashlib
-import io
 import json
 import os
 import platform
 import shutil
-import subprocess
+import subprocess  # nosec B404
 import sys
 import time
 import uuid
 from datetime import datetime
 from pathlib import Path
 from threading import Thread
-from typing import Any
 
-import cv2
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
 from pydantic import BaseModel
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 # 引入既有的推論模組
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -43,6 +41,7 @@ FACE_CACHE.mkdir(parents=True, exist_ok=True)
 
 VALID_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 MODEL_PATH = PROJECT_ROOT / "models" / "mobilenet_face.pth"
+OSASCRIPT = "/usr/bin/osascript"
 
 # Frontend build output(production 才用)
 FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"
@@ -51,6 +50,36 @@ FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"
 # 全局狀態:scan jobs
 # ──────────────────────────────────────────────────────────────────────────
 JOBS: dict[str, dict] = {}
+AUTHORIZED_ROOTS: set[Path] = set()
+
+
+def authorize_root(path: Path | str) -> Path:
+    """Register a user-selected directory as the filesystem security boundary."""
+    root = Path(path).expanduser().resolve(strict=True)
+    if not root.is_dir():
+        raise HTTPException(400, "授權根目錄必須是資料夾")
+    AUTHORIZED_ROOTS.add(root)
+    return root
+
+
+def require_authorized_path(
+    path: Path | str,
+    root: Path | str | None = None,
+    *,
+    must_exist: bool = True,
+) -> Path:
+    """Resolve a path and reject access outside a user-selected root."""
+    try:
+        resolved = Path(path).expanduser().resolve(strict=must_exist)
+        candidate_roots = AUTHORIZED_ROOTS
+        if root is not None:
+            requested_root = Path(root).expanduser().resolve(strict=True)
+            candidate_roots = {requested_root} if requested_root in AUTHORIZED_ROOTS else set()
+        if not any(resolved == allowed or resolved.is_relative_to(allowed) for allowed in candidate_roots):
+            raise ValueError
+    except (OSError, RuntimeError, ValueError):
+        raise HTTPException(403, "此路徑不在已選取的照片資料夾內") from None
+    return resolved
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -63,13 +92,31 @@ app = FastAPI(
 )
 
 # CORS — dev 時 Vue 在 5173,production 同源就不需要
+ALLOWED_BROWSER_ORIGINS = {
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+}
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:8000"],
+    allow_origins=sorted(ALLOWED_BROWSER_ORIGINS),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Accept", "Content-Type"],
 )
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=["localhost", "127.0.0.1", "[::1]"],
+)
+
+
+@app.middleware("http")
+async def reject_cross_site_browser_requests(request, call_next):
+    origin = request.headers.get("origin")
+    if origin and origin not in ALLOWED_BROWSER_ORIGINS:
+        return JSONResponse({"detail": "不允許跨網站存取本機照片服務"}, status_code=403)
+    return await call_next(request)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -117,8 +164,8 @@ def select_folder():
             '"選擇要掃描的照片資料夾")'
         )
         try:
-            result = subprocess.run(
-                ["osascript", "-e", script],
+            result = subprocess.run(  # nosec B603
+                [OSASCRIPT, "-e", script],
                 check=True,
                 capture_output=True,
                 text=True,
@@ -126,7 +173,7 @@ def select_folder():
         except subprocess.CalledProcessError as e:
             if e.returncode == 1:
                 return JSONResponse({"cancelled": True, "folder": None})
-            raise HTTPException(500, e.stderr.strip() or "無法開啟資料夾選擇器")
+            raise HTTPException(500, e.stderr.strip() or "無法開啟資料夾選擇器") from e
         folder = result.stdout.strip().rstrip("/")
         return {"cancelled": False, "folder": folder}
 
@@ -148,8 +195,8 @@ def select_files():
             'return output'
         )
         try:
-            result = subprocess.run(
-                ["osascript", "-e", script],
+            result = subprocess.run(  # nosec B603
+                [OSASCRIPT, "-e", script],
                 check=True,
                 capture_output=True,
                 text=True,
@@ -157,7 +204,7 @@ def select_files():
         except subprocess.CalledProcessError as e:
             if e.returncode == 1:
                 return JSONResponse({"cancelled": True, "paths": []})
-            raise HTTPException(500, e.stderr.strip() or "無法開啟照片選擇器")
+            raise HTTPException(500, e.stderr.strip() or "無法開啟照片選擇器") from e
         paths = [p for p in result.stdout.splitlines() if p.strip()]
         return {"cancelled": False, "paths": paths}
 
@@ -192,8 +239,8 @@ def _scan_root_for_files(images: list[Path]) -> Path:
 def _save_face_thumb(face_rgb, item_path: Path) -> str:
     """把 AI 裁切的人臉(numpy RGB)存成 JPEG,回傳 cache 檔名(供前端取用)。"""
     # 用原始檔路徑 + mtime 當 hash key,確保檔案不變就直接用 cache
-    key = hashlib.md5(
-        f"{item_path}::{item_path.stat().st_mtime}".encode("utf-8")
+    key = hashlib.sha256(
+        f"{item_path}::{item_path.stat().st_mtime}".encode()
     ).hexdigest()
     out_path = FACE_CACHE / f"{key}.jpg"
     if not out_path.exists():
@@ -285,6 +332,10 @@ def start_scan(req: ScanRequest):
     else:
         raise HTTPException(400, "請先選擇資料夾或圖片")
 
+    folder = authorize_root(folder)
+    if selected_images is not None:
+        selected_images = [require_authorized_path(image, folder) for image in selected_images]
+
     if not MODEL_PATH.is_file():
         raise HTTPException(503, "模型檔不存在,請先訓練或下載 models/mobilenet_face.pth")
 
@@ -325,7 +376,7 @@ def cancel_scan(job_id: str):
 @app.get("/api/image")
 def get_image(path: str = Query(...), w: int = Query(0)):
     """讀本機圖片,可選擇 resize 寬度。"""
-    p = Path(path)
+    p = require_authorized_path(path)
     if not p.is_file() or p.suffix.lower() not in VALID_EXTS:
         raise HTTPException(404, "圖片不存在或不支援格式")
 
@@ -334,8 +385,8 @@ def get_image(path: str = Query(...), w: int = Query(0)):
         return FileResponse(str(p))
 
     # 縮圖(快取在 backend/cache/thumbs/{hash}_{w}.jpg)
-    key = hashlib.md5(
-        f"{p}::{p.stat().st_mtime}::{w}".encode("utf-8")
+    key = hashlib.sha256(
+        f"{p}::{p.stat().st_mtime}::{w}".encode()
     ).hexdigest()
     cache_path = CACHE_DIR / "thumbs" / f"{key}.jpg"
     cache_path.parent.mkdir(parents=True, exist_ok=True)
@@ -347,13 +398,15 @@ def get_image(path: str = Query(...), w: int = Query(0)):
             img.thumbnail(new_size, Image.LANCZOS)
             img.save(cache_path, quality=82, optimize=True)
         except Exception as e:
-            raise HTTPException(500, f"縮圖失敗:{e}")
+            raise HTTPException(500, f"縮圖失敗:{e}") from e
     return FileResponse(str(cache_path), media_type="image/jpeg")
 
 
 @app.get("/api/face/{face_id}")
 def get_face(face_id: str):
     """AI 裁切人臉縮圖(掃描時已存在 cache)。"""
+    if len(face_id) != 64 or any(c not in "0123456789abcdef" for c in face_id):
+        raise HTTPException(404, "face 縮圖不存在")
     p = FACE_CACHE / f"{face_id}.jpg"
     if not p.is_file():
         raise HTTPException(404, "face 縮圖不存在")
@@ -364,7 +417,8 @@ def get_face(face_id: str):
 # Trash
 # ──────────────────────────────────────────────────────────────────────────
 def _manifest_path(folder: Path) -> Path:
-    return folder / "Trash" / "manifest.json"
+    trash_dir = require_authorized_path(folder / "Trash", folder, must_exist=False)
+    return require_authorized_path(trash_dir / "manifest.json", folder, must_exist=False)
 
 
 def _read_manifest(folder: Path) -> list[dict]:
@@ -426,8 +480,8 @@ def _move_file_to_system_trash(path: Path) -> None:
         '  end tell\n'
         'end run'
     )
-    subprocess.run(
-        ["osascript", "-e", script, "--", str(path)],
+    subprocess.run(  # nosec B603
+        [OSASCRIPT, "-e", script, "--", str(path)],
         check=True,
         capture_output=True,
         text=True,
@@ -436,9 +490,10 @@ def _move_file_to_system_trash(path: Path) -> None:
 
 @app.post("/api/trash")
 def move_to_trash(req: TrashRequest):
-    folder = Path(req.folder)
+    folder = require_authorized_path(req.folder)
     trash_dir = folder / "Trash"
     trash_dir.mkdir(exist_ok=True)
+    trash_dir = require_authorized_path(trash_dir, folder)
 
     existing = _dedupe_manifest_entries(_read_manifest(folder))
     active_keys: set[tuple[str, str]] = set()
@@ -459,7 +514,11 @@ def move_to_trash(req: TrashRequest):
     skipped: list[str] = []
 
     for path_str in req.paths:
-        src = Path(path_str)
+        try:
+            src = require_authorized_path(path_str, folder)
+        except HTTPException:
+            failed.append("未授權的檔案")
+            continue
         if not src.is_file():
             failed.append(path_str)
             continue
@@ -504,7 +563,7 @@ def move_to_trash(req: TrashRequest):
 @app.get("/api/trash")
 def list_trash(folder: str = Query(...)):
     """列出指定資料夾下 Trash 的所有照片(含縮圖 URL)。"""
-    folder_p = Path(folder)
+    folder_p = require_authorized_path(folder)
     manifest = _dedupe_manifest_entries(_read_manifest(folder_p))
     _write_manifest(folder_p, manifest)
 
@@ -525,7 +584,7 @@ def list_trash(folder: str = Query(...)):
 
 @app.post("/api/trash/restore")
 def restore_from_trash(req: RestoreRequest):
-    folder = Path(req.folder)
+    folder = require_authorized_path(req.folder)
     mf = _manifest_path(folder)
     if not mf.is_file():
         return {"restored": 0, "failed": []}
@@ -546,8 +605,14 @@ def restore_from_trash(req: RestoreRequest):
             remaining.append(entry)
             continue
 
-        src = Path(entry["trash_path"])
-        dst = Path(entry["original_path"])
+        try:
+            src = require_authorized_path(entry["trash_path"], folder)
+            dst = require_authorized_path(
+                entry["original_path"], folder, must_exist=False,
+            )
+        except HTTPException:
+            failed.append("manifest 包含未授權路徑")
+            continue
         if not src.is_file():
             failed.append(str(src))
             continue
@@ -571,7 +636,7 @@ def restore_from_trash(req: RestoreRequest):
 
 @app.post("/api/trash/system-delete")
 def move_trash_items_to_system_trash(req: SystemTrashRequest):
-    folder = Path(req.folder)
+    folder = require_authorized_path(req.folder)
     mf = _manifest_path(folder)
     if not mf.is_file():
         return {"deleted": 0, "failed": [], "remaining": 0}
@@ -592,7 +657,11 @@ def move_trash_items_to_system_trash(req: SystemTrashRequest):
             remaining.append(entry)
             continue
 
-        src = Path(trash_path)
+        try:
+            src = require_authorized_path(trash_path, folder)
+        except HTTPException:
+            failed.append("manifest 包含未授權路徑")
+            continue
         if not src.is_file():
             deleted += 1
             continue

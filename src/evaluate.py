@@ -19,6 +19,7 @@ import sys
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")  # 不開視窗,只存檔
 import matplotlib.pyplot as plt
 import numpy as np
@@ -29,14 +30,8 @@ from sklearn.metrics import (
     confusion_matrix,
 )
 from torch.utils.data import DataLoader
-from torchvision import transforms
-from torchvision.datasets import ImageFolder
 
 from src.train_mobilenet import (
-    IMAGENET_MEAN,
-    IMAGENET_STD,
-    IMG_SIZE,
-    SEED,
     build_model,
     make_loaders,
 )
@@ -172,7 +167,7 @@ def evaluate(
     print(f"[info] output = {output_dir}")
 
     # 載入 checkpoint
-    ckpt = torch.load(model_path, map_location=device, weights_only=False)
+    ckpt = torch.load(model_path, map_location=device, weights_only=True)
     arch = ckpt.get("arch", "mobilenet_v2")
     classes = ckpt["classes"]
     threshold = float(ckpt.get("decision_threshold", 0.5))
@@ -195,7 +190,7 @@ def evaluate(
     )
 
     cm = confusion_matrix(y_true, y_pred)
-    print(f"\nConfusion Matrix(列=真實,欄=預測):")
+    print("\nConfusion Matrix(列=真實,欄=預測):")
     print(f"             pred {classes[0]:<5}  pred {classes[1]:<5}")
     for i, cls in enumerate(classes):
         print(f"true {cls:<5}   {cm[i, 0]:5d}        {cm[i, 1]:5d}")
@@ -235,7 +230,7 @@ def evaluate(
     errors_path = output_dir / "top_errors.txt"
     errors_path.write_text("\n".join(err_lines), encoding="utf-8")
     print(f"[ok] top errors → {errors_path}")
-    print(f"\n看一下這幾張最值得復盤的:")
+    print("\n看一下這幾張最值得復盤的:")
     for e in errors[:5]:
         print(f"  [{e['true']}→{e['pred']}, {e['confidence']*100:.1f}%]  {Path(e['path']).name}")
 

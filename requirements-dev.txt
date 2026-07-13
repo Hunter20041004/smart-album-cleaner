@@ -4,3 +4,4 @@
 pytest>=7.0
 pytest-cov>=4.0
 ruff>=0.1   # 程式碼風格 + lint
+httpx>=0.27,<1.0  # FastAPI TestClient / API contract tests

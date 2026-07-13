@@ -24,7 +24,8 @@ import sys
 from pathlib import Path
 
 import cv2
-import mediapipe as mp
+
+from src.face_detector import FaceDetector
 
 CLASSES = ("Good", "Bad")
 IMG_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
@@ -73,16 +74,20 @@ def _crop_letterbox_bgr(bgr, std_threshold: float = 8.0):
     top = bottom = left = right = 0
     for i in range(max_cv):
         if gray[i, :].std() > std_threshold:
-            top = i; break
+            top = i
+            break
     for i in range(max_cv):
         if gray[h - 1 - i, :].std() > std_threshold:
-            bottom = i; break
+            bottom = i
+            break
     for i in range(max_ch):
         if gray[:, i].std() > std_threshold:
-            left = i; break
+            left = i
+            break
     for i in range(max_ch):
         if gray[:, w - 1 - i].std() > std_threshold:
-            right = i; break
+            right = i
+            break
     if top + bottom + left + right == 0:
         return bgr, (0, 0)
     return bgr[top:h - bottom, left:w - right], (left, top)
@@ -99,10 +104,7 @@ def _process_image(
 ) -> int:
     """處理單張照片,回傳實際輸出張數。
 
-    三層 fallback:
-        1. primary detector(model 0)
-        2. fallback detector(model 1)
-        3. 裁掉 letterbox 黑邊後再跑 1+2
+    先偵測原圖；若失敗，裁掉 letterbox 邊框後重試。
     輸出檔名會加上父資料夾前綴,避免重名衝突。
     """
     img = cv2.imread(str(img_path))
@@ -110,38 +112,32 @@ def _process_image(
         return 0
     h, w = img.shape[:2]
     rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    result = detector.process(rgb)
-    if (not result.detections) and fallback_detector is not None:
-        result = fallback_detector.process(rgb)
+    detections = detector.detect(rgb)
+    if not detections and fallback_detector is not None:
+        detections = fallback_detector.detect(rgb)
 
-    # 第 3 層 fallback:裁掉純色邊框再試
-    work_img = img
+    # 裁掉純色邊框後重試
     offset_x, offset_y = 0, 0
-    if not result.detections:
+    if not detections:
         cropped, (offset_x, offset_y) = _crop_letterbox_bgr(img)
         if cropped.shape != img.shape:
             rgb_c = cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB)
-            result = detector.process(rgb_c)
-            if (not result.detections) and fallback_detector is not None:
-                result = fallback_detector.process(rgb_c)
-            if result.detections:
-                work_img = cropped
+            detections = detector.detect(rgb_c)
+            if not detections and fallback_detector is not None:
+                detections = fallback_detector.detect(rgb_c)
 
-    if not result.detections:
+    if not detections:
         return 0
 
     out_stem = _safe_stem(img_path, raw_class_dir)
 
     # bbox 是相對於 work_img(可能是裁過 letterbox 後的);要加上 offset 才能落回原圖
-    h_work, w_work = work_img.shape[:2]
-
     saved = 0
-    for i, det in enumerate(result.detections):
-        bbox = det.location_data.relative_bounding_box
-        fx = int(bbox.xmin * w_work) + offset_x
-        fy = int(bbox.ymin * h_work) + offset_y
-        fw = int(bbox.width * w_work)
-        fh = int(bbox.height * h_work)
+    for i, bbox in enumerate(detections):
+        fx = bbox.x + offset_x
+        fy = bbox.y + offset_y
+        fw = bbox.width
+        fh = bbox.height
         if fw < min_face_px or fh < min_face_px:
             continue
         # _expand_box 用原圖大小做邊界 clip
@@ -150,7 +146,7 @@ def _process_image(
             continue
         crop = img[y1:y2, x1:x2]
         face = cv2.resize(crop, (TARGET_SIZE, TARGET_SIZE), interpolation=cv2.INTER_AREA)
-        suffix = "" if len(result.detections) == 1 else f"_face{i}"
+        suffix = "" if len(detections) == 1 else f"_face{i}"
         out_path = out_dir / f"{out_stem}{suffix}.jpg"
         cv2.imwrite(str(out_path), face, [cv2.IMWRITE_JPEG_QUALITY, 95])
         saved += 1
@@ -201,32 +197,22 @@ def prepare_dataset(
             )
 
     out_root.mkdir(parents=True, exist_ok=True)
-    # 雙模型 fallback 策略:
-    # primary  = model 0 (短距離 / 大臉,擅長肖像、自拍、頭像)
-    # fallback = model 1 (長距離 / 小臉,擅長合照中的中遠距人物)
-    # 先試 primary,沒抓到再試 fallback,兩個的優點都吃到
-    primary = mp.solutions.face_detection.FaceDetection(
-        model_selection=0, min_detection_confidence=min_confidence,
-    )
-    fallback = mp.solutions.face_detection.FaceDetection(
-        model_selection=1, min_detection_confidence=min_confidence,
-    )
+    detector = FaceDetector(min_confidence=min_confidence)
 
     print(f"[info] raw → {raw_root}")
     print(f"[info] out → {out_root}")
     print(f"[info] margin={margin:.0%}, min_face_px={min_face_px}, "
-          f"min_confidence={min_confidence}, dual-model fallback ON")
+          f"min_confidence={min_confidence}, MediaPipe Tasks")
 
     try:
         for cls in CLASSES:
             print(f"\n[{cls}] 處理中…")
             n_in, n_out, skipped = prepare_class(
-                primary,
+                detector,
                 raw_root / cls,
                 out_root / cls,
                 margin,
                 min_face_px,
-                fallback_detector=fallback,
             )
             print(f"  輸入 {n_in} 張 → 輸出 {n_out} 張人臉")
             if skipped:
@@ -234,8 +220,7 @@ def prepare_dataset(
                 for p in skipped[:5]:
                     print(f"    - {p.name}")
     finally:
-        primary.close()
-        fallback.close()
+        detector.close()
 
     print("\n[done] 前處理完成。")
 

@@ -12,6 +12,9 @@ if [ ! -d ".venv" ]; then
   .venv/bin/pip install -r requirements.txt -q
 fi
 
+# ── 官方 MediaPipe 模型（下載後先驗證 SHA-256）────────────────────
+.venv/bin/python scripts/download_models.py
+
 # ── 前端建置 ─────────────────────────────────────────────────────────
 FRONTEND_DIST="frontend/dist/index.html"
 if [ ! -f "$FRONTEND_DIST" ]; then
@@ -28,4 +31,4 @@ echo ""
 echo "✅ 啟動成功 → http://localhost:8000"
 echo "   按 Ctrl+C 停止"
 echo ""
-exec .venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8000
+exec .venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8000

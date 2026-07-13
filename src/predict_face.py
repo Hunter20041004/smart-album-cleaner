@@ -12,15 +12,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Union
 
 import cv2
-import mediapipe as mp
 import numpy as np
 import torch
 import torch.nn.functional as F
 from torchvision import transforms
 
+from src.face_detector import FaceDetector
 from src.prepare_dataset import _expand_box
 from src.train_mobilenet import (
     IMAGENET_MEAN,
@@ -30,7 +29,7 @@ from src.train_mobilenet import (
 )
 
 DEFAULT_MODEL_PATH = Path("models/mobilenet_face.pth")
-ImageInput = Union[str, Path, np.ndarray]
+ImageInput = str | Path | np.ndarray
 
 
 class NoFaceDetectedError(Exception):
@@ -39,23 +38,17 @@ class NoFaceDetectedError(Exception):
 
 # ── 模組級快取 ───────────────────────────────────────────────────────────────
 _model_cache: dict[str, tuple[torch.nn.Module, list[str], torch.device, float]] = {}
-_detector = None  # primary: model 0 (短距離,擅長肖像)
-_detector_fallback = None  # fallback: model 1 (長距離,擅長合照中遠距人物)
+_detector: FaceDetector | None = None
+_detector_fallback = None  # 保留名稱，讓舊呼叫端清快取時不會壞掉
 _eval_tf: transforms.Compose | None = None
 
 
-def _get_detectors():
-    """回傳 (primary, fallback) 兩個 MediaPipe 偵測器,lazy 載入。"""
-    global _detector, _detector_fallback
+def _get_detector() -> FaceDetector:
+    """Lazy-load the supported MediaPipe Tasks detector."""
+    global _detector
     if _detector is None:
-        _detector = mp.solutions.face_detection.FaceDetection(
-            model_selection=0, min_detection_confidence=0.3,
-        )
-    if _detector_fallback is None:
-        _detector_fallback = mp.solutions.face_detection.FaceDetection(
-            model_selection=1, min_detection_confidence=0.3,
-        )
-    return _detector, _detector_fallback
+        _detector = FaceDetector(min_confidence=0.3)
+    return _detector
 
 
 def _get_eval_transform() -> transforms.Compose:
@@ -87,7 +80,7 @@ def _load_model(
             f"找不到模型檔:{model_path}(請先跑 train_mobilenet.py)"
         )
     device = _pick_device()
-    ckpt = torch.load(model_path, map_location=device, weights_only=False)
+    ckpt = torch.load(model_path, map_location=device, weights_only=True)
     classes = ckpt.get("classes")
     if not classes:
         raise RuntimeError(
@@ -133,16 +126,20 @@ def _crop_letterbox(bgr: np.ndarray, std_threshold: float = 8.0) -> tuple[np.nda
     top = bottom = left = right = 0
     for i in range(max_crop_v):
         if gray[i, :].std() > std_threshold:
-            top = i; break
+            top = i
+            break
     for i in range(max_crop_v):
         if gray[h - 1 - i, :].std() > std_threshold:
-            bottom = i; break
+            bottom = i
+            break
     for i in range(max_crop_h):
         if gray[:, i].std() > std_threshold:
-            left = i; break
+            left = i
+            break
     for i in range(max_crop_h):
         if gray[:, w - 1 - i].std() > std_threshold:
-            right = i; break
+            right = i
+            break
 
     if top + bottom + left + right == 0:
         return bgr, (0, 0)  # 沒 letterbox,原樣回傳
@@ -154,52 +151,42 @@ def _detect_largest_face(
 ) -> tuple[int, int, int, int]:
     """回傳 (x1, y1, x2, y2);找不到合格人臉則丟 NoFaceDetectedError。
 
-    三層 fallback:
-      1. primary (model=0, 短距離 / 大臉,擅長肖像)
-      2. fallback (model=1, 長距離 / 小臉,擅長合照)
-      3. 裁掉 letterbox 黑邊 → 再跑 1 + 2(處理 iPhone 截圖等情況)
+    先以 MediaPipe Tasks 偵測原圖；若失敗，裁掉 letterbox 邊框後重試。
     """
-    primary, fallback = _get_detectors()
+    detector = _get_detector()
 
     def _try_detect(img_bgr: np.ndarray):
         rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-        r = primary.process(rgb)
-        if not r.detections:
-            r = fallback.process(rgb)
-        return r
+        return detector.detect(rgb)
 
-    # 第 1+2 層:原圖直接餵
+    # 第 1 層：原圖直接偵測
     result = _try_detect(bgr)
     offset_x, offset_y = 0, 0
-    work_img = bgr
-    if not result.detections:
-        # 第 3 層:裁 letterbox 後再試
+    if not result:
+        # 第 2 層：裁 letterbox 後再試
         cropped, (offset_x, offset_y) = _crop_letterbox(bgr)
         if cropped.shape != bgr.shape:  # 真的裁了東西才重試
             result = _try_detect(cropped)
-            work_img = cropped
-    if not result.detections:
+    if not result:
         raise NoFaceDetectedError(
-            "MediaPipe(雙模型 + letterbox 裁切)都沒找到人臉"
+            "MediaPipe Tasks（含 letterbox 裁切）找不到人臉"
         )
 
-    h_work, w_work = work_img.shape[:2]
     H, W = bgr.shape[:2]  # 原圖大小 — 最後要回傳的座標是相對於原圖的
 
     best = None
     best_area = 0
-    for det in result.detections:
-        bbox = det.location_data.relative_bounding_box
-        fw = int(bbox.width * w_work)
-        fh = int(bbox.height * h_work)
+    for bbox in result:
+        fw = bbox.width
+        fh = bbox.height
         if fw < min_face_px or fh < min_face_px:
             continue
         area = fw * fh
         if area > best_area:
             best_area = area
             # 換算回原圖座標(加上 letterbox offset)
-            fx = int(bbox.xmin * w_work) + offset_x
-            fy = int(bbox.ymin * h_work) + offset_y
+            fx = bbox.x + offset_x
+            fy = bbox.y + offset_y
             best = (fx, fy, fw, fh)
     if best is None:
         raise NoFaceDetectedError(

@@ -12,7 +12,7 @@
 
 ## ✨ 為什麼用這個?
 
-- ⚡ **本機運行,完全離線** — 你的私密照片不會上傳到任何雲端
+- ⚡ **本機運行** — 首次安裝模型後可離線使用，你的照片不會上傳到雲端
 - 🧠 **自訓深度學習模型** — MobileNetV3-Large + SE Attention,專為「人臉表情品質」訓練
 - 🎯 **三分頁清晰分類** — ⚠️ 建議刪除 / ✅ 完美表情 / 👀 未偵測到人臉
 - 🛡️ **軟刪除安全網** — 移到 `Trash/` 而非永久刪除,可隨時還原
@@ -28,7 +28,7 @@
 | 工具 | 版本 | 下載 |
 |------|------|------|
 | Python | 3.11+ | [python.org](https://www.python.org/downloads/) |
-| Node.js | 18+ | [nodejs.org](https://nodejs.org/) |
+| Node.js | 20.19+ 或 22.12+ | [nodejs.org](https://nodejs.org/) |
 | Git | 任意 | [git-scm.com](https://git-scm.com/) |
 
 ---
@@ -76,9 +76,10 @@ cd ..
 :: 4. 建立虛擬環境 + 安裝套件
 python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
+.venv\Scripts\python scripts\download_models.py
 
 :: 5. 啟動
-.venv\Scripts\uvicorn backend.main:app --host 0.0.0.0 --port 8000
+.venv\Scripts\uvicorn backend.main:app --host 127.0.0.1 --port 8000
 ```
 
 瀏覽器開啟 → **http://localhost:8000**
@@ -128,7 +129,7 @@ python -m venv .venv
      ▼
 ┌─────────────────────────────┐
 │  prepare_dataset.py         │
-│  ─ MediaPipe 三層 Fallback  │  ← short-range → full-range → letterbox
+│  ─ MediaPipe Tasks API      │  ← 官方模型 + letterbox fallback
 │  ─ 向外擴張 15% 保留頭部    │
 │  ─ 統一裁成 224×224         │
 └─────────────────────────────┘
@@ -147,7 +148,7 @@ python -m venv .venv
 │  FastAPI 後端               │◄──►│  Vue 3 前端(SPA)       │
 │  ─ REST API (8 endpoints)   │    │  ─ 掃描進度 polling     │
 │  ─ 非同步掃描 job queue     │    │  ─ 三分頁結果 + 勾選   │
-│  ─ 縮圖快取(MD5)           │    │  ─ Trash 管理 + 還原   │
+│  ─ 縮圖快取(SHA-256)       │    │  ─ Trash 管理 + 還原   │
 │  ─ 同源服務靜態檔           │    │  ─ Darkroom 視覺主題   │
 └─────────────────────────────┘    └────────────────────────┘
 ```
@@ -188,6 +189,7 @@ smart-album-cleaner/
 │   └── vite.config.js
 ├── src/
 │   ├── extract_frames.py         ← 影片轉影格
+│   ├── face_detector.py          ← MediaPipe Tasks 安全轉接層
 │   ├── prepare_dataset.py        ← MediaPipe 裁切前處理
 │   ├── train_mobilenet.py        ← 訓練腳本
 │   ├── predict_face.py           ← 推論(TTA + 快取)
@@ -197,7 +199,8 @@ smart-album-cleaner/
 │   ├── raw/{Good,Bad}/           ← 你的原始照片(不 commit)
 │   └── processed/{Good,Bad}/    ← 自動產生(不 commit)
 └── models/
-    └── mobilenet_face.pth        ← 從 Releases 下載(不 commit)
+    ├── mobilenet_face.pth        ← 從 Releases 下載(不 commit)
+    └── blaze_face_short_range.tflite ← 官方模型、SHA-256 驗證(不 commit)
 ```
 
 ---
@@ -225,20 +228,40 @@ python -m src.evaluate --model models/mobilenet_face.pth
 ## 🎯 路線圖
 
 ### 已完成 ✅
-- [x] MediaPipe 三層 fallback 人臉偵測
+- [x] MediaPipe Tasks 人臉偵測 + letterbox fallback
 - [x] MobileNetV2 / V3-Large 雙架構支援
 - [x] Stage-1(凍結) + Stage-2(解凍微調)兩階段訓練
 - [x] 資料增強 + 決策閾值自動調校 + Test-Time Augmentation
 - [x] FastAPI 後端 + Vue 3 前端分離架構
 - [x] 非同步掃描 + 即時進度 polling
 - [x] 三分頁 UI + 批次軟刪除 + Trash 還原
-- [x] 伺服器端縮圖快取(Pillow + MD5)
+- [x] 伺服器端縮圖快取(Pillow + SHA-256)
 
 ### 未來 🔮
 - [ ] 連拍智慧選最佳(同時間組內取 Good 信心最高者)
 - [ ] EXIF 整合(按相機型號 / 拍攝日期篩選)
 - [ ] 桌面 App 打包(`.app` / `.exe`)
 - [ ] 使用者標註回饋,建立 data flywheel
+
+---
+
+## 🔐 本機資料與安全設計
+
+- API 只綁定 `127.0.0.1`，並拒絕非 loopback Host 與未允許的瀏覽器 Origin。
+- 使用者選取資料夾後，後端才會在本次程序授權該 canonical root；預覽、Trash、還原與系統垃圾桶都不能越界，symlink 也不能跳脫。
+- 照片與人臉縮圖只在本機處理，`datasets/`、`Trash/`、`backend/cache/` 與模型權重均由 `.gitignore` 排除。
+- PyTorch checkpoint 一律使用 `weights_only=True` 載入，不允許任意 pickle 程式碼執行。
+- MediaPipe Tasks 模型取自官方儲存空間；下載器驗證 SHA-256：`b4578f35940bf5a1a655214a1cce5cab13eba73c1297cd78e1a04c2380b0152f`。
+
+重現本專案的安全檢查：
+
+```bash
+.venv/bin/python -m pytest
+.venv/bin/ruff check backend src tests scripts
+.venv/bin/pip-audit
+.venv/bin/bandit -q -r backend src scripts
+cd frontend && npm ci && npm run build && npm audit --audit-level=high
+```
 
 ---
 

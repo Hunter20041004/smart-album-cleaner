@@ -11,6 +11,7 @@ __pycache__/
 
 # ─── 虛擬環境 ────────────────────────────────────────────────────────
 .venv/
+.venv*/
 venv/
 env/
 
@@ -27,6 +28,7 @@ Trash/
 
 # 模型權重(用 GitHub Releases 發佈,不放在 repo)
 models/*.pth
+models/*.tflite
 
 # Streamlit / SQLite 暫存
 *.db

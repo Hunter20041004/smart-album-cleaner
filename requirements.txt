@@ -1,14 +1,13 @@
 # ─── AI 表情相簿管家 — 依賴清單 ──────────────────────────────────────
 # 安裝: pip install -r requirements.txt
-# 已驗證可共存版本(2026-05 測試於 macOS Apple Silicon + Python 3.11)
+# 已驗證可共存版本（2026-07，macOS Apple Silicon + Python 3.12）
 
 # ── 核心:深度學習 ────────────────────────────────────────────────────
 torch>=2.2,<3.0
 torchvision>=0.17,<1.0
 
-# ── 人臉偵測(注意:0.10.10+ 移除了 solutions API,鎖在 0.10.9) ───────
-mediapipe>=0.10,<0.10.10
-protobuf<4   # mediapipe 0.10.9 與 protobuf 4+ 不相容
+# ── 人臉偵測（支援中的 MediaPipe Tasks API）────────────────────────
+mediapipe>=0.10.35,<0.11
 
 # ── 影像處理 ─────────────────────────────────────────────────────────
 opencv-python>=4.8.0
@@ -17,6 +16,8 @@ numpy>=2.0
 
 # ── Web UI ───────────────────────────────────────────────────────────
 streamlit>=1.30.0
+fastapi>=0.115,<1.0
+uvicorn>=0.30,<1.0
 
 # ── 數據視覺化(confusion matrix / loss curves) ──────────────────────
 matplotlib>=3.7
