@@ -2,6 +2,7 @@ import json
 import os
 import re
 import shlex
+import struct
 import subprocess
 import tomllib
 from pathlib import Path
@@ -159,6 +160,38 @@ def test_canonical_fastapi_vue_entrypoints_are_wired():
     assert any(
         command[:3] == ["exec", ".venv/bin/uvicorn", "backend.main:app"]
         for command in launch_commands
+    )
+
+
+def test_frontend_exposes_portfolio_capture_command():
+    package = json.loads(
+        (ROOT / "frontend/package.json").read_text(encoding="utf-8")
+    )
+
+    assert package["scripts"]["portfolio:capture"] == (
+        "playwright test e2e/portfolio-evidence.spec.js"
+    )
+    assert "@playwright/test" in package["devDependencies"]
+
+
+def test_portfolio_dashboard_is_exact_synthetic_png():
+    screenshot = (ROOT / "docs/screenshots/dashboard.png").read_bytes()
+
+    assert screenshot[:8] == b"\x89PNG\r\n\x1a\n"
+    assert struct.unpack(">II", screenshot[16:24]) == (1440, 900)
+
+    fixture_source = (
+        ROOT / "frontend/e2e/portfolio-evidence.spec.js"
+    ).read_text(encoding="utf-8")
+    image_basenames = re.findall(
+        r"[A-Za-z0-9_ -]+\.(?:jpe?g|png|heic|webp|bmp|gif|tiff?)",
+        fixture_source,
+        re.IGNORECASE,
+    )
+    assert image_basenames
+    assert all(
+        name == "dashboard.png" or re.fullmatch(r"sample-\d{3}\.jpg", name)
+        for name in image_basenames
     )
 
 
