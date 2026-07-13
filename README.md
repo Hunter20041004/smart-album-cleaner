@@ -31,7 +31,9 @@ curl -L https://github.com/Hunter20041004/smart-album-cleaner/releases/latest/do
 
 `run.sh` 會建立 `.venv`、安裝 Python 依賴、下載並驗證 MediaPipe 模型、在需要時建置 Vue 前端，最後以 Uvicorn 啟動 `backend.main:app`。瀏覽器開啟 <http://localhost:8000>。
 
-### Windows
+### Windows（僅開發啟動）
+
+> 平台限制：原生資料夾／檔案選擇器與完整 UI 掃描流程目前僅支援 macOS。下列 Windows 指令僅供前後端開發啟動；目前 Windows UI 無法選取掃描來源，也不支援完整掃描流程。
 
 ```bat
 git clone https://github.com/Hunter20041004/smart-album-cleaner.git
@@ -98,13 +100,13 @@ run.sh                      macOS / Linux 本機啟動腳本
 
 ## 自訓模型
 
-資料準備、訓練與評估仍由 `src/` 下的命令列工具負責：
+資料準備、訓練與評估仍由 `src/` 下的命令列工具負責。macOS / Linux 在 `./run.sh` 建立 `.venv` 後執行：
 
 ```bash
-python -m src.prepare_dataset
-python -m src.train_mobilenet --arch mobilenet_v3_large
-python -m src.train_mobilenet --arch mobilenet_v3_large --finetune
-python -m src.evaluate --model models/mobilenet_face.pth
+.venv/bin/python -m src.prepare_dataset
+.venv/bin/python -m src.train_mobilenet --arch mobilenet_v3_large
+.venv/bin/python -m src.train_mobilenet --arch mobilenet_v3_large --finetune
+.venv/bin/python -m src.evaluate --model models/mobilenet_face.pth
 ```
 
 訓練照片、處理後資料、Trash、快取與模型權重都應保留在本機，且不提交到 Git。
