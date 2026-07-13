@@ -1,23 +1,13 @@
 Top 10 「最自信卻錯了」的測試樣本 — 看這些可以理解模型瓶頸
 
 ────────────────────────────────────────────────────────────────────────────────
- 1. [真實:Good → 預測:Bad ] 信心  89.2%  P(Bad)=0.892
-    datasets/processed/Good/E好_new__IMG_3186.jpg
- 2. [真實:Bad  → 預測:Good] 信心  86.1%  P(Bad)=0.139
-    datasets/processed/Bad/IMG_3050.jpg
- 3. [真實:Bad  → 預測:Good] 信心  78.3%  P(Bad)=0.217
-    datasets/processed/Bad/D 壞 (15).jpg
- 4. [真實:Good → 預測:Bad ] 信心  74.9%  P(Bad)=0.749
-    datasets/processed/Good/IMG_2730_face1.jpg
- 5. [真實:Good → 預測:Bad ] 信心  72.9%  P(Bad)=0.729
-    datasets/processed/Good/IMG_2737_face3.jpg
- 6. [真實:Bad  → 預測:Good] 信心  72.8%  P(Bad)=0.272
-    datasets/processed/Bad/D 壞 (53).jpg
- 7. [真實:Good → 預測:Bad ] 信心  70.8%  P(Bad)=0.708
-    datasets/processed/Good/IMG_2963.jpg
- 8. [真實:Good → 預測:Bad ] 信心  70.5%  P(Bad)=0.705
-    datasets/processed/Good/IMG_2705.jpg
- 9. [真實:Good → 預測:Bad ] 信心  69.5%  P(Bad)=0.695
-    datasets/processed/Good/E好_new__IMG_3019.jpg
-10. [真實:Bad  → 預測:Good] 信心  68.4%  P(Bad)=0.316
-    datasets/processed/Bad/D 壞 (51).jpg
+ 1. sample-001 [真實:Good → 預測:Bad ] 信心  89.2%  P(Bad)=0.892
+ 2. sample-002 [真實:Bad  → 預測:Good] 信心  86.1%  P(Bad)=0.139
+ 3. sample-003 [真實:Bad  → 預測:Good] 信心  78.3%  P(Bad)=0.217
+ 4. sample-004 [真實:Good → 預測:Bad ] 信心  74.9%  P(Bad)=0.749
+ 5. sample-005 [真實:Good → 預測:Bad ] 信心  72.9%  P(Bad)=0.729
+ 6. sample-006 [真實:Bad  → 預測:Good] 信心  72.8%  P(Bad)=0.272
+ 7. sample-007 [真實:Good → 預測:Bad ] 信心  70.8%  P(Bad)=0.708
+ 8. sample-008 [真實:Good → 預測:Bad ] 信心  70.5%  P(Bad)=0.705
+ 9. sample-009 [真實:Good → 預測:Bad ] 信心  69.5%  P(Bad)=0.695
+10. sample-010 [真實:Bad  → 預測:Good] 信心  68.4%  P(Bad)=0.316
