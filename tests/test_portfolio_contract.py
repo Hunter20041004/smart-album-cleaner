@@ -589,3 +589,121 @@ def test_model_card_validator_rejects_known_claims_masked_by_split_unknown():
 
     with pytest.raises(AssertionError):
         _validate_model_card_against_report(hostile_card, report)
+
+
+def _validate_ci_workflow(workflow: str) -> None:
+    required_fragments = (
+        "name: CI",
+        "permissions:\n  contents: read",
+        "concurrency:",
+        "cancel-in-progress: true",
+        "timeout-minutes:",
+        "persist-credentials: false",
+        "python-version: '3.12'",
+        "python -m pip install -r requirements-dev.txt pip-audit",
+        "python -m pip check",
+        "pip-audit -r requirements.txt",
+        "python -m ruff check .",
+        "python -m pytest tests/test_model_download.py -q",
+        "python -m pytest -q",
+        "node-version: '22'",
+        "npm ci",
+        "npm run build",
+        "npm audit --audit-level=high",
+    )
+    for fragment in required_fragments:
+        assert fragment in workflow
+
+    assert workflow.count("timeout-minutes:") == 2
+    assert workflow.count("persist-credentials: false") == 2
+    assert "pull_request_target:" not in workflow
+
+    prohibited_fragments = (
+        "secrets.",
+        "github.token",
+        "services:",
+        "continue-on-error",
+        "|| true",
+        "set +e",
+        "if: always()",
+        ": write",
+        "write-all",
+        "curl ",
+        "wget ",
+        "download_models.py",
+        "mobilenet_face.pth",
+        "models/",
+        "datasets/",
+        "/Users/",
+        "/private/",
+    )
+    for fragment in prohibited_fragments:
+        assert fragment not in workflow
+
+    expected_actions = {
+        "actions/checkout": (
+            "34e114876b0b11c390a56381ad16ebd13914f8d5",
+            "v4.3.1",
+        ),
+        "actions/setup-python": (
+            "a26af69be951a213d495a4c3e4e4022e16d87065",
+            "v5.6.0",
+        ),
+        "actions/setup-node": (
+            "49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "v4.4.0",
+        ),
+    }
+    action_uses = re.findall(
+        r"uses:\s+([^@\s]+)@([0-9a-f]{40})\s+#\s+([^\s]+)", workflow
+    )
+    assert workflow.count("uses:") == len(action_uses)
+    assert len(action_uses) == 4
+    for action, sha, tag in action_uses:
+        assert action in expected_actions
+        assert (sha, tag) == expected_actions[action]
+
+
+def test_ci_workflow_enforces_safety_and_quality_boundaries():
+    workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    _validate_ci_workflow(workflow)
+
+    tracked_paths = subprocess.run(
+        ["git", "ls-files"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    prohibited_tracked_paths = [
+        path
+        for path in tracked_paths
+        if path.casefold().startswith("datasets/")
+        or (
+            path.casefold().startswith("models/")
+            and path.casefold().endswith(".pth")
+        )
+    ]
+    assert prohibited_tracked_paths == []
+
+    hostile_variants = (
+        workflow + "\nservices:\n  database:\n    image: postgres\n",
+        workflow + "\nenv:\n  TOKEN: ${{ secrets.PRIVATE_TOKEN }}\n",
+        workflow.replace(
+            "python -m pytest -q", "python -m pytest -q || true", 1
+        ),
+        workflow.replace(
+            "actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+            "actions/checkout@v4",
+            1,
+        ),
+        workflow + "\n- uses: third-party/example@v1\n",
+        workflow.replace(
+            "python -m pytest tests/test_model_download.py -q",
+            "python scripts/download_models.py",
+            1,
+        ),
+    )
+    for hostile_workflow in hostile_variants:
+        with pytest.raises(AssertionError):
+            _validate_ci_workflow(hostile_workflow)
