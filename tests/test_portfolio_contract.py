@@ -1,6 +1,11 @@
 import json
+import shlex
 import subprocess
 from pathlib import Path
+
+from fastapi import FastAPI
+
+from backend.main import app as backend_app
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -16,7 +21,19 @@ def test_canonical_fastapi_vue_entrypoints_are_wired():
 
     package = json.loads(frontend_manifest.read_text(encoding="utf-8"))
     assert "vue" in package["dependencies"]
-    assert "backend.main:app" in run_script.read_text(encoding="utf-8")
+
+    assert isinstance(backend_app, FastAPI)
+    assert "/api/health" in {route.path for route in backend_app.routes}
+
+    launch_commands = [
+        shlex.split(line)
+        for line in run_script.read_text(encoding="utf-8").splitlines()
+        if line.lstrip().startswith("exec ")
+    ]
+    assert any(
+        command[:3] == ["exec", ".venv/bin/uvicorn", "backend.main:app"]
+        for command in launch_commands
+    )
 
 
 def test_readme_states_current_macos_ui_limit():
