@@ -1,5 +1,7 @@
 # AI 表情相簿管家 — Smart Album Cleaner
 
+[![CI](https://github.com/Hunter20041004/smart-album-cleaner/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Hunter20041004/smart-album-cleaner/actions/workflows/ci.yml)
+
 Smart Album Cleaner 是在本機執行的照片整理工具。它使用 MobileNetV3 模型分析人臉表情品質，讓使用者檢視掃描結果，並以可還原的 Trash 流程整理照片。
 
 目前唯一的應用程式架構是 **FastAPI + Vue 3**：`backend/main.py` 提供 REST API 並服務建置後的前端，`frontend/` 是 Vue 3 SPA。專案不再提供另一套 Web UI 入口。
