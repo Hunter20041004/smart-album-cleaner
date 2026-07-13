@@ -1,5 +1,5 @@
 """
-FastAPI 後端 — AI 表情相簿管家 v2.0
+FastAPI 後端 — AI 表情相簿管家 v0.2.0
 
 啟動: uvicorn backend.main:app --reload --port 8000
 """
@@ -87,7 +87,7 @@ def require_authorized_path(
 # ──────────────────────────────────────────────────────────────────────────
 app = FastAPI(
     title="Darkroom · AI Photo Curator API",
-    version="2.0.0",
+    version="0.2.0",
     description="FastAPI 後端,提供照片掃描、Trash 管理、影像縮圖等服務。",
 )
 
@@ -134,12 +134,12 @@ class TrashRequest(BaseModel):
 
 class RestoreRequest(BaseModel):
     folder: str
-    trash_paths: list[str] | None = None  # None = 全部還原
+    trash_paths: list[str] | None = None  # Explicit paths only; None/[] = no-op
 
 
 class SystemTrashRequest(BaseModel):
     folder: str
-    trash_paths: list[str] | None = None  # None = 全部移到系統垃圾桶
+    trash_paths: list[str] | None = None  # Explicit paths only; None/[] = no-op
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -593,8 +593,10 @@ def restore_from_trash(req: RestoreRequest):
         manifest = json.loads(mf.read_text(encoding="utf-8"))
     except Exception:
         return {"restored": 0, "failed": []}
+    if not req.trash_paths:
+        return {"restored": 0, "failed": [], "remaining": len(manifest)}
 
-    target_set = set(req.trash_paths or [])  # 空 = 全部還原
+    target_set = set(req.trash_paths)
     restored = 0
     failed: list[str] = []
     remaining: list[dict] = []
@@ -645,8 +647,10 @@ def move_trash_items_to_system_trash(req: SystemTrashRequest):
         manifest = json.loads(mf.read_text(encoding="utf-8"))
     except Exception:
         return {"deleted": 0, "failed": [], "remaining": 0}
+    if not req.trash_paths:
+        return {"deleted": 0, "failed": [], "remaining": len(manifest)}
 
-    target_set = set(req.trash_paths or [])  # 空 = 全部移到系統垃圾桶
+    target_set = set(req.trash_paths)
     deleted = 0
     failed: list[str] = []
     remaining: list[dict] = []

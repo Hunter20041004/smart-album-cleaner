@@ -4,7 +4,18 @@ Smart Album Cleaner 是在本機執行的照片整理工具。它使用 MobileNe
 
 目前唯一的應用程式架構是 **FastAPI + Vue 3**：`backend/main.py` 提供 REST API 並服務建置後的前端，`frontend/` 是 Vue 3 SPA。專案不再提供另一套 Web UI 入口。
 
+App version `0.2.0` and classifier release `v1.0.0` are independent release
+identifiers: the app version describes this source tree, while the classifier
+tag identifies the separately downloaded checkpoint artifact.
+
 **Evidence summary (English):** The tracked evaluation reports **75.1% accuracy on 193 labelled test examples** for the subjective binary `Good`/`Bad` task (`Bad` recall 82.8%; `Good` recall 67.0%). This result does not establish real-world, subgroup, or identity-recognition performance. Performance depends on hardware and image size; no reproducible runtime benchmark is tracked. See the [Model Card](docs/MODEL_CARD.md) for evidence, class-level results, and limitations.
+
+## Synthetic UI evidence
+
+![Synthetic Smart Album review dashboard](docs/screenshots/dashboard.png)
+
+This portfolio screenshot is generated entirely from synthetic fixtures and
+contains no real or private photos.
 
 ## 功能範圍
 
@@ -139,4 +150,21 @@ cd frontend && npm install && npm run build
 
 ## License
 
-MIT — 詳見 [`LICENSE`](LICENSE)。
+The [`LICENSE`](LICENSE) file is intentionally narrow: **MIT applies only to
+project-owned source code** in this repository. The repository does not grant
+blanket MIT rights over models, data, evaluation material, dependencies, or
+user content.
+
+- **Classifier checkpoint licence: unknown.** The tracked evidence verifies a
+  release checksum, not redistribution or reuse rights for
+  `mobilenet_face.pth`.
+- **Dataset and evaluation artifact licences: unknown.** Their tracked
+  provenance does not establish origin, consent, or reuse terms, so they must
+  not be treated as MIT-licensed.
+- **MediaPipe model and third-party dependencies retain their own licences**
+  and terms; consult their upstream distributions before reuse.
+- **User images are not covered by the project licence.** They remain local
+  user content and are not included in this repository.
+- [`docs/screenshots/dashboard.png`](docs/screenshots/dashboard.png) is a
+  synthetic, project-generated UI capture containing no real or private
+  photos.

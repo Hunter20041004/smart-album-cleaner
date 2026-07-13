@@ -25,6 +25,23 @@ function solidSvg(color) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240" viewBox="0 0 320 240"><rect width="320" height="240" fill="${color}"/></svg>`
 }
 
+async function installOfflineBoundary(page, externalRequests) {
+  const loopbackHosts = new Set(['127.0.0.1', 'localhost', '[::1]', '::1'])
+  await page.route('**/*', async route => {
+    const request = route.request()
+    const url = new URL(request.url())
+    if (
+      (url.protocol === 'http:' || url.protocol === 'https:') &&
+      !loopbackHosts.has(url.hostname)
+    ) {
+      externalRequests.push(`${request.method()} ${url.origin}${url.pathname}`)
+      await route.abort('blockedbyclient')
+      return
+    }
+    await route.fallback()
+  })
+}
+
 async function installApiFixtureRouter(page, unexpectedRequests) {
   await page.route('**/api/**', async route => {
     const request = route.request()
@@ -82,11 +99,13 @@ async function installApiFixtureRouter(page, unexpectedRequests) {
 
 test('blocks API requests outside the synthetic fixture allowlist', async ({ page }) => {
   const fallbackRequests = []
+  const externalRequests = []
   const unexpectedRequests = []
   await page.route('**/api/**', route => {
     fallbackRequests.push(route.request().url())
     return route.fulfill({ status: 418, body: 'unexpected fallback' })
   })
+  await installOfflineBoundary(page, externalRequests)
   await installApiFixtureRouter(page, unexpectedRequests)
   await page.goto('/')
 
@@ -101,13 +120,43 @@ test('blocks API requests outside the synthetic fixture allowlist', async ({ pag
 
   expect(result).toEqual({ blocked: true })
   expect(fallbackRequests).toEqual([])
+  expect(externalRequests).toEqual([])
   expect(unexpectedRequests).toEqual(['GET /api/unexpected'])
+})
+
+test('blocks non-loopback network requests', async ({ page }) => {
+  const fallbackRequests = []
+  const externalRequests = []
+  const unexpectedRequests = []
+  await page.route('https://external.invalid/**', route => {
+    fallbackRequests.push(route.request().url())
+    return route.fulfill({ status: 418, body: 'unexpected external fallback' })
+  })
+  await installOfflineBoundary(page, externalRequests)
+  await installApiFixtureRouter(page, unexpectedRequests)
+  await page.goto('/')
+
+  const result = await page.evaluate(async () => {
+    try {
+      const response = await fetch('https://external.invalid/asset')
+      return { blocked: false, status: response.status }
+    } catch {
+      return { blocked: true }
+    }
+  })
+
+  expect(result).toEqual({ blocked: true })
+  expect(fallbackRequests).toEqual([])
+  expect(externalRequests).toEqual(['GET https://external.invalid/asset'])
+  expect(unexpectedRequests).toEqual([])
 })
 
 test('captures the real review-before-trash flow with synthetic fixtures', async ({ page }) => {
   const pageErrors = []
+  const externalRequests = []
   const unexpectedRequests = []
   page.on('pageerror', error => pageErrors.push(error.message))
+  await installOfflineBoundary(page, externalRequests)
   await installApiFixtureRouter(page, unexpectedRequests)
 
   await page.goto('/')
@@ -119,7 +168,7 @@ test('captures the real review-before-trash flow with synthetic fixtures', async
   await page.getByRole('button', { name: '啟動 AI 掃描' }).click()
   await expect(page.getByText('神經網路正在分析…')).toBeVisible()
 
-  const badTab = page.getByRole('button', { name: '⚠ 建議刪除 · 3' })
+  const badTab = page.getByRole('button', { name: '⚠ 建議檢視 · 3' })
   const trashAction = page.getByRole('button', { name: '🗑 移到 Trash' })
   await expect(badTab).toBeVisible()
   await badTab.click()
@@ -137,5 +186,6 @@ test('captures the real review-before-trash flow with synthetic fixtures', async
     fullPage: false,
   })
   expect(pageErrors).toEqual([])
+  expect(externalRequests).toEqual([])
   expect(unexpectedRequests).toEqual([])
 })

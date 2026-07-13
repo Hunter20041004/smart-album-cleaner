@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "smart-album-cleaner"
 version = "0.2.0"
-description = "AI 表情相簿管家 — 用自訓 MobileNetV3 模型挑出表情崩壞的廢片"
+description = "AI 表情相簿管家 — 用 MobileNetV3 協助標記需要人工檢視的照片"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }

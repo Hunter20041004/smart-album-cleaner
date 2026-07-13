@@ -97,7 +97,7 @@ function shortFolder(p) {
         <div class="stat-value">{{ nTotal }}</div>
       </div>
       <div class="stat-card" style="--accent: var(--crimson);">
-        <div class="stat-label">建議刪除</div>
+        <div class="stat-label">建議檢視</div>
         <div class="stat-value">{{ nBad }}</div>
       </div>
       <div class="stat-card" style="--accent: var(--sage);">
@@ -113,7 +113,7 @@ function shortFolder(p) {
     <!-- Tabs -->
     <div class="tabs">
       <button class="tab" :class="{ active: activeTab === 'bad' }"
-              @click="activeTab = 'bad'">⚠ 建議刪除 · {{ nBad }}</button>
+              @click="activeTab = 'bad'">⚠ 建議檢視 · {{ nBad }}</button>
       <button class="tab" :class="{ active: activeTab === 'good' }"
               @click="activeTab = 'good'">✓ 完美表情 · {{ nGood }}</button>
       <button class="tab" :class="{ active: activeTab === 'noface' }"
@@ -157,7 +157,7 @@ function shortFolder(p) {
         <!-- Cards grid -->
         <div class="photo-grid cols-3">
           <div v-for="item in pagedBad" :key="item.path" class="photo-card">
-            <span class="conf conf-bad">崩壞機率 {{ (item.prob * 100).toFixed(1) }}%</span>
+            <span class="conf conf-bad">需檢視分數 {{ (item.prob * 100).toFixed(1) }}%</span>
             <label class="check-row">
               <input
                 type="checkbox"
@@ -182,8 +182,8 @@ function shortFolder(p) {
       </template>
       <div v-else class="empty">
         <div class="empty-glyph">✓</div>
-        <div class="empty-title">沒有發現廢片</div>
-        <div class="empty-desc">AI 沒有偵測到任何表情崩壞的照片。</div>
+        <div class="empty-title">沒有待檢視照片</div>
+        <div class="empty-desc">AI 沒有標記任何需要檢視的表情照片。</div>
       </div>
     </div>
 

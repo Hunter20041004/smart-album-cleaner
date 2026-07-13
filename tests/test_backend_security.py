@@ -98,6 +98,78 @@ def test_temp_album_preview_trash_and_restore_flow(tmp_path):
     assert photo.read_bytes() == b"synthetic fixture"
 
 
+def test_restore_empty_selection_is_noop(tmp_path, monkeypatch):
+    album = tmp_path / "album"
+    trash = album / "Trash"
+    trash.mkdir(parents=True)
+    trashed_photo = trash / "photo.jpg"
+    trashed_photo.write_bytes(b"synthetic fixture")
+    original_photo = album / "photo.jpg"
+    main.authorize_root(album)
+    main._write_manifest(
+        album,
+        [{
+            "original_path": str(original_photo),
+            "trash_path": str(trashed_photo),
+            "deleted_at": "2026-07-13T00:00:00",
+        }],
+    )
+    manifest = main._manifest_path(album)
+    manifest_before = manifest.read_bytes()
+    move_calls = []
+    monkeypatch.setattr(
+        main.shutil,
+        "move",
+        lambda *args: move_calls.append(args),
+    )
+
+    response = client.post(
+        "/api/trash/restore",
+        json={"folder": str(album), "trash_paths": []},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"restored": 0, "failed": [], "remaining": 1}
+    assert manifest.read_bytes() == manifest_before
+    assert move_calls == []
+
+
+def test_system_trash_empty_selection_is_noop(tmp_path, monkeypatch):
+    album = tmp_path / "album"
+    trash = album / "Trash"
+    trash.mkdir(parents=True)
+    trashed_photo = trash / "photo.jpg"
+    trashed_photo.write_bytes(b"synthetic fixture")
+    original_photo = album / "photo.jpg"
+    main.authorize_root(album)
+    main._write_manifest(
+        album,
+        [{
+            "original_path": str(original_photo),
+            "trash_path": str(trashed_photo),
+            "deleted_at": "2026-07-13T00:00:00",
+        }],
+    )
+    manifest = main._manifest_path(album)
+    manifest_before = manifest.read_bytes()
+    system_trash_calls = []
+    monkeypatch.setattr(
+        main,
+        "_move_file_to_system_trash",
+        lambda path: system_trash_calls.append(path),
+    )
+
+    response = client.post(
+        "/api/trash/system-delete",
+        json={"folder": str(album), "trash_paths": []},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"deleted": 0, "failed": [], "remaining": 1}
+    assert manifest.read_bytes() == manifest_before
+    assert system_trash_calls == []
+
+
 def test_trash_directory_symlink_cannot_escape_authorized_root(tmp_path):
     album = tmp_path / "album"
     outside = tmp_path / "outside"

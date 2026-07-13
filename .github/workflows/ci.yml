@@ -42,7 +42,7 @@ jobs:
       - name: Lint
         run: python -m ruff check .
 
-      - name: Verify classifier checksum contract
+      - name: Verify MediaPipe model checksum contract
         run: python -m pytest tests/test_model_download.py -q
 
       - name: Test

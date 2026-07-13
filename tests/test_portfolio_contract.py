@@ -176,6 +176,36 @@ def test_frontend_exposes_portfolio_capture_command():
     assert "@playwright/test" in package["devDependencies"]
 
 
+def test_frontend_uses_only_offline_system_fonts():
+    index = (ROOT / "frontend/index.html").read_text(encoding="utf-8")
+    styles = (ROOT / "frontend/src/styles.css").read_text(encoding="utf-8")
+
+    external_resources = re.findall(
+        r'(?:src|href)="(https?://[^"]+)"', index, re.IGNORECASE
+    )
+    assert external_resources == []
+    for remote_family in ("Noto Sans TC", "Noto Serif TC", "JetBrains Mono"):
+        assert remote_family not in styles
+    for system_family in ("-apple-system", "PingFang TC", "Songti TC", "SF Mono"):
+        assert system_family in styles
+
+
+def test_public_copy_frames_model_output_as_review_suggestions():
+    public_copy = "\n".join(
+        (ROOT / path).read_text(encoding="utf-8")
+        for path in (
+            "pyproject.toml",
+            "frontend/src/components/WelcomePage.vue",
+            "frontend/src/components/ResultsView.vue",
+        )
+    )
+
+    for definitive_term in ("廢片", "崩壞", "建議刪除"):
+        assert definitive_term not in public_copy
+    assert "建議檢視" in public_copy
+    assert "需檢視分數" in public_copy
+
+
 def _validate_portfolio_png(path: Path) -> None:
     screenshot = path.read_bytes()
 
@@ -301,6 +331,33 @@ def test_package_metadata_targets_macos():
     assert "Operating System :: MacOS :: MacOS X" in project["classifiers"]
 
 
+def test_app_and_model_versions_are_distinct_and_consistent():
+    project = tomllib.loads(
+        (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    )["project"]
+    frontend_package = json.loads(
+        (ROOT / "frontend/package.json").read_text(encoding="utf-8")
+    )
+    frontend_lock = json.loads(
+        (ROOT / "frontend/package-lock.json").read_text(encoding="utf-8")
+    )
+    backend = (ROOT / "backend/main.py").read_text(encoding="utf-8")
+    welcome = (ROOT / "frontend/src/components/WelcomePage.vue").read_text(
+        encoding="utf-8"
+    )
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert project["version"] == "0.2.0"
+    assert frontend_package["version"] == "0.2.0"
+    assert frontend_lock["version"] == "0.2.0"
+    assert frontend_lock["packages"][""]["version"] == "0.2.0"
+    assert 'version="0.2.0"' in backend
+    assert "App v0.2.0 · Model v1.0.0" in welcome
+    assert "App version `0.2.0` and classifier release `v1.0.0`" in readme
+    assert "v2.0" not in backend + welcome
+    assert 'version="2.0.0"' not in backend
+
+
 def test_readme_installs_verification_prerequisites_before_checks():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     verification = readme.split("## 驗證", maxsplit=1)[1]
@@ -418,6 +475,40 @@ def test_readme_summarizes_model_evidence_and_limits():
     assert "75.1% accuracy on 193 labelled test examples" in readme
     assert "Performance depends on hardware and image size" in readme
     assert "[Model Card](docs/MODEL_CARD.md)" in readme
+
+
+def test_readme_embeds_synthetic_dashboard_evidence():
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    heading = "## Synthetic UI evidence"
+    assert heading in readme
+    evidence = readme.split(heading, maxsplit=1)[1].split(
+        "## ", maxsplit=1
+    )[0]
+
+    assert re.search(
+        r"!\[[^\]]+\]\(docs/screenshots/dashboard\.png\)", evidence
+    )
+    normalized_evidence = " ".join(evidence.split()).casefold()
+    assert "synthetic fixtures" in normalized_evidence
+    assert "no real or private photos" in normalized_evidence
+
+
+def test_readme_limits_mit_scope_and_states_artifact_licences():
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    license_section = readme.split("## License", maxsplit=1)[1]
+    normalized_scope = " ".join(license_section.split())
+
+    required_statements = (
+        "MIT applies only to project-owned source code",
+        "Classifier checkpoint licence: unknown",
+        "Dataset and evaluation artifact licences: unknown",
+        "MediaPipe model and third-party dependencies retain their own licences",
+        "User images are not covered by the project licence",
+        "synthetic, project-generated UI capture containing no real or private photos",
+    )
+    assert all(statement in normalized_scope for statement in required_statements)
+    assert "The repository does not grant blanket MIT rights" in normalized_scope
+    assert "docs/screenshots/dashboard.png" in license_section
 
 
 def test_model_card_records_verified_release_artifact():
@@ -707,3 +798,10 @@ def test_ci_workflow_enforces_safety_and_quality_boundaries():
     for hostile_workflow in hostile_variants:
         with pytest.raises(AssertionError):
             _validate_ci_workflow(hostile_workflow)
+
+
+def test_ci_names_model_checksum_step_truthfully():
+    workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+
+    assert "- name: Verify MediaPipe model checksum contract" in workflow
+    assert "Verify classifier checksum contract" not in workflow
