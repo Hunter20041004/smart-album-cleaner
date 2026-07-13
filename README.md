@@ -49,7 +49,7 @@ trap - EXIT
 ./run.sh
 ```
 
-`run.sh` 會建立 `.venv`、安裝 Python 依賴、下載並驗證 MediaPipe 模型、在需要時建置 Vue 前端，最後以 Uvicorn 啟動 `backend.main:app`。瀏覽器開啟 <http://localhost:8000>。
+`run.sh` 會建立 `.venv`、安裝 Python 依賴、下載並驗證 MediaPipe 模型，並在 Vue 原始碼或 package lock 的 fingerprint 改變時重建前端，最後以 Uvicorn 啟動 `backend.main:app`。fingerprint 相符時可直接使用既有離線 build；需要強制重建時執行 `FORCE_FRONTEND_BUILD=1 ./run.sh`。瀏覽器開啟 <http://localhost:8000>。
 
 ### Windows（僅開發啟動）
 

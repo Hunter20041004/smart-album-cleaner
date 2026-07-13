@@ -17,13 +17,41 @@ fi
 
 # ── 前端建置 ─────────────────────────────────────────────────────────
 FRONTEND_DIST="frontend/dist/index.html"
-if [ ! -f "$FRONTEND_DIST" ]; then
+FRONTEND_FINGERPRINT_FILE="frontend/dist/.source-fingerprint"
+
+frontend_source_fingerprint() {
+  {
+    find frontend/src -type f -print
+    for file in \
+      frontend/index.html \
+      frontend/package.json \
+      frontend/package-lock.json \
+      frontend/vite.config.js
+    do
+      [ ! -f "$file" ] || printf '%s\n' "$file"
+    done
+  } | LC_ALL=C sort | while IFS= read -r file; do
+    shasum -a 256 "$file"
+  done | shasum -a 256 | awk '{print $1}'
+}
+
+FRONTEND_FINGERPRINT="$(frontend_source_fingerprint)"
+STORED_FRONTEND_FINGERPRINT=""
+if [ -f "$FRONTEND_FINGERPRINT_FILE" ]; then
+  STORED_FRONTEND_FINGERPRINT="$(cat "$FRONTEND_FINGERPRINT_FILE")"
+fi
+
+if [ "${FORCE_FRONTEND_BUILD:-0}" = "1" ] \
+  || [ ! -f "$FRONTEND_DIST" ] \
+  || [ "$STORED_FRONTEND_FINGERPRINT" != "$FRONTEND_FINGERPRINT" ]; then
   echo "[setup] 建置前端..."
   if ! command -v node &>/dev/null; then
     echo "❌ 找不到 node，請先安裝 Node.js (https://nodejs.org/)"
     exit 1
   fi
   cd frontend && npm install -q && npm run build && cd ..
+  FRONTEND_FINGERPRINT="$(frontend_source_fingerprint)"
+  printf '%s\n' "$FRONTEND_FINGERPRINT" > "$FRONTEND_FINGERPRINT_FILE"
 fi
 
 # ── 啟動後端(同時服務前端靜態檔) ────────────────────────────────────

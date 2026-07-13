@@ -165,6 +165,90 @@ def test_canonical_fastapi_vue_entrypoints_are_wired():
     )
 
 
+def test_run_script_rebuilds_stale_frontend_and_reuses_matching_build(
+    tmp_path: Path,
+):
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "run.sh").write_text(
+        (ROOT / "run.sh").read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    (project / "run.sh").chmod(0o755)
+
+    venv_bin = project / ".venv/bin"
+    venv_bin.mkdir(parents=True)
+    for command in ("python", "uvicorn"):
+        executable = venv_bin / command
+        executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        executable.chmod(0o755)
+
+    frontend = project / "frontend"
+    (frontend / "src").mkdir(parents=True)
+    (frontend / "dist").mkdir()
+    (frontend / "src/main.js").write_text("export const version = 2\n")
+    (frontend / "index.html").write_text("<div id='app'></div>\n")
+    (frontend / "package.json").write_text('{"scripts":{"build":"vite build"}}\n')
+    (frontend / "package-lock.json").write_text('{"lockfileVersion":3}\n')
+    (frontend / "vite.config.js").write_text("export default {}\n")
+    (frontend / "dist/index.html").write_text("stale\n")
+    (frontend / "dist/.source-fingerprint").write_text("stale-fingerprint\n")
+
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    event_log = tmp_path / "npm-events.log"
+    event_log.write_text("", encoding="utf-8")
+    node = fake_bin / "node"
+    node.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    node.chmod(0o755)
+    npm = fake_bin / "npm"
+    npm.write_text(
+        "#!/bin/sh\n"
+        'printf \'%s\\n\' "$*" >> "$EVENT_LOG"\n'
+        'if [ "$1" = "run" ] && [ "$2" = "build" ]; then\n'
+        "  mkdir -p dist\n"
+        "  printf 'fresh\\n' > dist/index.html\n"
+        "fi\n",
+        encoding="utf-8",
+    )
+    npm.chmod(0o755)
+    env = os.environ | {
+        "EVENT_LOG": str(event_log),
+        "PATH": f"{fake_bin}:{os.environ['PATH']}",
+    }
+
+    first = subprocess.run(
+        ["bash", "run.sh"], cwd=project, env=env, capture_output=True, text=True
+    )
+    assert first.returncode == 0, first.stderr
+    assert event_log.read_text(encoding="utf-8").splitlines() == [
+        "install -q",
+        "run build",
+    ]
+    assert (frontend / "dist/index.html").read_text() == "fresh\n"
+    fingerprint = (frontend / "dist/.source-fingerprint").read_text().strip()
+    assert fingerprint and fingerprint != "stale-fingerprint"
+
+    event_log.write_text("", encoding="utf-8")
+    second = subprocess.run(
+        ["bash", "run.sh"], cwd=project, env=env, capture_output=True, text=True
+    )
+    assert second.returncode == 0, second.stderr
+    assert event_log.read_text(encoding="utf-8") == ""
+
+    forced = subprocess.run(
+        ["bash", "run.sh"],
+        cwd=project,
+        env=env | {"FORCE_FRONTEND_BUILD": "1"},
+        capture_output=True,
+        text=True,
+    )
+    assert forced.returncode == 0, forced.stderr
+    assert event_log.read_text(encoding="utf-8").splitlines() == [
+        "install -q",
+        "run build",
+    ]
+
+
 def test_frontend_exposes_portfolio_capture_command():
     package = json.loads(
         (ROOT / "frontend/package.json").read_text(encoding="utf-8")
