@@ -66,7 +66,9 @@ def _classifier_install_bash_block() -> str:
     )[0]
 
 
-def _run_classifier_install_bash_block(tmp_path: Path, shasum_exit: int):
+def _run_classifier_install_bash_block(
+    tmp_path: Path, shasum_exit: int, block: str | None = None
+):
     fake_bin = tmp_path / "bin"
     fake_bin.mkdir(parents=True)
     event_log = tmp_path / "events.log"
@@ -98,9 +100,16 @@ def _run_classifier_install_bash_block(tmp_path: Path, shasum_exit: int):
         "/bin/mv \"$@\"\n",
         encoding="utf-8",
     )
-    curl.chmod(0o755)
-    shasum.chmod(0o755)
-    mv.chmod(0o755)
+    mktemp = fake_bin / "mktemp"
+    mktemp.write_text(
+        "#!/bin/sh\n"
+        'temporary="$TMPDIR/classifier.download"\n'
+        ': > "$temporary"\n'
+        'printf \'%s\\n\' "$temporary"\n',
+        encoding="utf-8",
+    )
+    for command in (curl, shasum, mv, mktemp):
+        command.chmod(0o755)
     env = os.environ | {
         "EVENT_LOG": str(event_log),
         "PATH": f"{fake_bin}:{os.environ['PATH']}",
@@ -108,7 +117,7 @@ def _run_classifier_install_bash_block(tmp_path: Path, shasum_exit: int):
         "TMPDIR": str(tmp_path),
     }
     completed = subprocess.run(
-        ["bash", "-c", _classifier_install_bash_block()],
+        ["bash", "-c", block or _classifier_install_bash_block()],
         cwd=tmp_path,
         env=env,
         capture_output=True,
@@ -116,6 +125,15 @@ def _run_classifier_install_bash_block(tmp_path: Path, shasum_exit: int):
     )
     events = event_log.read_text(encoding="utf-8").splitlines()
     return completed, events
+
+
+def _assert_classifier_install_failure(
+    tmp_path: Path, completed: subprocess.CompletedProcess[str], events: list[str]
+) -> None:
+    assert completed.returncode != 0
+    assert events == ["verify"]
+    assert not (tmp_path / "models/mobilenet_face.pth").exists()
+    assert not (tmp_path / "classifier.download").exists()
 
 
 def test_canonical_fastapi_vue_entrypoints_are_wired():
@@ -328,12 +346,24 @@ def test_classifier_install_bash_block_fails_closed_before_move(tmp_path):
         tmp_path / "succeeded", shasum_exit=0
     )
 
-    assert failed.returncode != 0
-    assert failed_events == ["verify"]
-    assert not (tmp_path / "failed/models/mobilenet_face.pth").exists()
+    _assert_classifier_install_failure(tmp_path / "failed", failed, failed_events)
     assert succeeded.returncode == 0
     assert succeeded_events == ["verify", "move"]
     assert (tmp_path / "succeeded/models/mobilenet_face.pth").is_file()
+
+
+def test_classifier_install_validator_rejects_missing_temp_cleanup(tmp_path):
+    cleanup_trap = 'trap \'rm -f "$MODEL_TMP"\' EXIT\n'
+    block = _classifier_install_bash_block()
+    assert cleanup_trap in block
+    hostile_block = block.replace(cleanup_trap, "", 1)
+    failed, failed_events = _run_classifier_install_bash_block(
+        tmp_path, shasum_exit=1, block=hostile_block
+    )
+    assert (tmp_path / "classifier.download").is_file()
+
+    with pytest.raises(AssertionError):
+        _assert_classifier_install_failure(tmp_path, failed, failed_events)
 
 
 def test_windows_classifier_verification_has_fail_closed_control_flow():
@@ -350,11 +380,7 @@ def test_windows_classifier_verification_has_fail_closed_control_flow():
     )
 
 
-def test_model_card_matches_tracked_report_and_states_safety_limits():
-    report = (ROOT / "reports/classification_report.txt").read_text(
-        encoding="utf-8"
-    )
-    card = (ROOT / "docs/MODEL_CARD.md").read_text(encoding="utf-8")
+def _validate_model_card_against_report(card: str, report: str) -> None:
     report_test_count = re.search(r"^Test n:\s*(\d+)$", report, re.MULTILINE)
     report_threshold = re.search(
         r"^Threshold \(P\(Bad\)\):\s*(\d+\.\d+)$", report, re.MULTILINE
@@ -400,8 +426,43 @@ def test_model_card_matches_tracked_report_and_states_safety_limits():
     assert card_threshold.group(1) == report_threshold.group(1)
     assert set(report_metrics) == {"Bad", "Good"}
     assert card_metrics == report_metrics
-    for unknown in ("origin", "consent", "licence", "split independence"):
-        assert unknown in data_limits
-    assert "unknown" in data_limits
+    provenance_limits = re.search(
+        r"does not contain a tracked measured report that establishes (.+?)\. "
+        r"those facts are unknown\.",
+        data_limits,
+    )
+    assert provenance_limits is not None
+    not_documented_facts = provenance_limits.group(1)
+    for fact in ("dataset's origin", "contributor consent", "licence"):
+        assert fact in not_documented_facts
     assert "split independence therefore cannot be confirmed" in data_limits
     assert "irreversible deletion without an explicit human decision" in recovery
+
+
+def test_model_card_matches_tracked_report_and_states_safety_limits():
+    report = (ROOT / "reports/classification_report.txt").read_text(
+        encoding="utf-8"
+    )
+    card = (ROOT / "docs/MODEL_CARD.md").read_text(encoding="utf-8")
+
+    _validate_model_card_against_report(card, report)
+
+
+def test_model_card_validator_rejects_known_claims_masked_by_split_unknown():
+    report = (ROOT / "reports/classification_report.txt").read_text(
+        encoding="utf-8"
+    )
+    card = (ROOT / "docs/MODEL_CARD.md").read_text(encoding="utf-8")
+    before_data, after_data = card.split("## Data", maxsplit=1)
+    _, after_evaluation = after_data.split("## Evaluation", maxsplit=1)
+    hostile_card = (
+        f"{before_data}## Data\n\n"
+        "The tracked report identifies a test set of 193 examples. "
+        "The dataset origin is known. Contributor consent is confirmed. "
+        "The dataset licence is known. Split independence therefore cannot "
+        "be confirmed and remains unknown.\n\n"
+        f"## Evaluation{after_evaluation}"
+    )
+
+    with pytest.raises(AssertionError):
+        _validate_model_card_against_report(hostile_card, report)
