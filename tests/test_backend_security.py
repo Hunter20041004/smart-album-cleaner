@@ -1,6 +1,6 @@
-from pathlib import Path
 import json
 import subprocess
+from pathlib import Path
 
 import pytest
 from fastapi import HTTPException
