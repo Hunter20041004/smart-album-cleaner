@@ -70,16 +70,27 @@ def require_authorized_path(
 ) -> Path:
     """Resolve a path and reject access outside a user-selected root."""
     try:
-        resolved = Path(path).expanduser().resolve(strict=must_exist)
+        requested = Path(path).expanduser()
+        if not requested.is_absolute():
+            raise ValueError
+
         candidate_roots = AUTHORIZED_ROOTS
         if root is not None:
             requested_root = Path(root).expanduser().resolve(strict=True)
             candidate_roots = {requested_root} if requested_root in AUTHORIZED_ROOTS else set()
-        if not any(resolved == allowed or resolved.is_relative_to(allowed) for allowed in candidate_roots):
-            raise ValueError
+
+        for allowed in candidate_roots:
+            try:
+                requested.relative_to(allowed)
+            except ValueError:
+                continue
+
+            resolved = requested.resolve(strict=must_exist)
+            if resolved == allowed or resolved.is_relative_to(allowed):
+                return resolved
     except (OSError, RuntimeError, ValueError):
-        raise HTTPException(403, "此路徑不在已選取的照片資料夾內") from None
-    return resolved
+        pass
+    raise HTTPException(403, "此路徑不在已選取的照片資料夾內") from None
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -174,8 +185,8 @@ def select_folder():
             if e.returncode == 1:
                 return JSONResponse({"cancelled": True, "folder": None})
             raise HTTPException(500, e.stderr.strip() or "無法開啟資料夾選擇器") from e
-        folder = result.stdout.strip().rstrip("/")
-        return {"cancelled": False, "folder": folder}
+        folder = authorize_root(result.stdout.strip().rstrip("/"))
+        return {"cancelled": False, "folder": str(folder)}
 
     raise HTTPException(501, "目前僅支援 macOS 原生資料夾選擇器")
 
@@ -205,7 +216,13 @@ def select_files():
             if e.returncode == 1:
                 return JSONResponse({"cancelled": True, "paths": []})
             raise HTTPException(500, e.stderr.strip() or "無法開啟照片選擇器") from e
-        paths = [p for p in result.stdout.splitlines() if p.strip()]
+        selected = [
+            Path(path).expanduser().resolve(strict=True)
+            for path in result.stdout.splitlines()
+            if path.strip()
+        ]
+        root = authorize_root(_scan_root_for_files(selected))
+        paths = [str(require_authorized_path(path, root)) for path in selected]
         return {"cancelled": False, "paths": paths}
 
     raise HTTPException(501, "目前僅支援 macOS 原生檔案選擇器")
@@ -318,21 +335,20 @@ def start_scan(req: ScanRequest):
     if req.paths:
         selected_images = []
         for path_str in req.paths:
-            img = Path(path_str).expanduser()
+            img = require_authorized_path(path_str)
             if not img.is_file():
                 raise HTTPException(404, f"圖片不存在:{img}")
             if img.suffix.lower() not in VALID_EXTS:
                 raise HTTPException(400, f"不支援的圖片格式:{img.name}")
             selected_images.append(img)
-        folder = _scan_root_for_files(selected_images)
+        folder = require_authorized_path(_scan_root_for_files(selected_images))
     elif req.folder:
-        folder = Path(req.folder).expanduser()
+        folder = require_authorized_path(req.folder)
         if not folder.is_dir():
             raise HTTPException(404, f"資料夾不存在:{folder}")
     else:
         raise HTTPException(400, "請先選擇資料夾或圖片")
 
-    folder = authorize_root(folder)
     if selected_images is not None:
         selected_images = [require_authorized_path(image, folder) for image in selected_images]
 
@@ -545,8 +561,8 @@ def move_to_trash(req: TrashRequest):
             new_entries.append(entry)
             active_keys.add((dest.name, str(dest.stat().st_size)))
             moved.append(path_str)
-        except Exception as e:
-            failed.append(f"{path_str}: {e}")
+        except Exception:
+            failed.append(f"{src.name}: 移至 Trash 失敗")
 
     existing.extend(new_entries)
     existing = _dedupe_manifest_entries(existing)
@@ -627,8 +643,8 @@ def restore_from_trash(req: RestoreRequest):
                 )
             shutil.move(str(src), str(dst))
             restored += 1
-        except Exception as e:
-            failed.append(f"{src}: {e}")
+        except Exception:
+            failed.append(f"{src.name}: 還原失敗")
             remaining.append(entry)
 
     mf.write_text(json.dumps(remaining, indent=2, ensure_ascii=False),
@@ -672,11 +688,11 @@ def move_trash_items_to_system_trash(req: SystemTrashRequest):
         try:
             _move_file_to_system_trash(src)
             deleted += 1
-        except subprocess.CalledProcessError as e:
-            failed.append(f"{src}: {e.stderr.strip() or e}")
+        except subprocess.CalledProcessError:
+            failed.append(f"{src.name}: 移至系統垃圾桶失敗")
             remaining.append(entry)
-        except Exception as e:
-            failed.append(f"{src}: {e}")
+        except Exception:
+            failed.append(f"{src.name}: 移至系統垃圾桶失敗")
             remaining.append(entry)
 
     mf.write_text(json.dumps(remaining, indent=2, ensure_ascii=False),
